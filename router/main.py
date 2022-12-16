@@ -43,7 +43,7 @@ def cee_intrepreter_submission(language, code, test_cases, input):
 
 
 @app.route('/')
-def app():
+def main():
     return """
     <h1>This is main page of Algorint</h1>
     """
