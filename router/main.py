@@ -24,7 +24,7 @@ def make_submission():
         abort(400)
     if (request.form.get("language") in ["python", "javascript"]):
         cee_intrepreter_submission(language, code, test_cases, input)
-    return redirect(url_for('app'))
+    return redirect(url_for('main'))
 
 
 def cee_intrepreter_submission(language, code, test_cases, input):
