@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cee-intrepreter-queue
+spec:
+  type: ClusterIP
+  selector:
+    app: cee-intrepreter-queue
+  ports:
+    - name: http
+      protocol: TCP
+      port: 15672
+      targetPort: 15672
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: 5672
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cee-intrepreter-queue-configmap
+data:
+  PLACEHOLDER: "NONE"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cee-intrepreter-queue-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cee-intrepreter-queue-secret
+stringData:
+  PLACEHOLDER: "NONE"
+type: Opaque
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cee-intrepreter-queue
+spec:
+  serviceName: "not-applicable"
+  selector:
+    matchLabels:
+      app: cee-intrepreter-queue
+  template:
+    metadata:
+      labels:
+        app: cee-intrepreter-queue
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+          ports:
+            - name: http
+              protocol: TCP
+              containerPort: 15672
+            - name: amqp
+              protocol: TCP
+              containerPort: 5672
+          envFrom:
+            - configMapRef:
+                name: cee-intrepreter-queue-configmap
+            - secretRef:
+                name: cee-intrepreter-queue-secret
+          volumeMounts:
+            - mountPath: "/var/lib/rabbitmq"
+              name: cee-intrepreter-queue-volume
+      volumes:
+        - name: cee-intrepreter-queue-volume
+          persistentVolumeClaim:
+            claimName: cee-intrepreter-queue-pvc
