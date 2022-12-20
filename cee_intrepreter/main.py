@@ -19,7 +19,20 @@ def callback(ch, method, properties, body):
     # Execute the code
     return_code = execute(data["language"])
     # TODO: Save the result to submission database
+    clean_up(data["language"])
     ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def clean_up(langauge):
+    os.remove("stderr.txt")
+    os.remove("stdout.txt")
+    os.remove("input.txt")
+    if (langauge == "nodejs"):
+        os.remove("code.js")
+    elif (langauge == "python"):
+        os.remove("code.py")
+    else:
+        print("Language not supported")
 
 
 def save_code(code, language):
@@ -53,12 +66,10 @@ def read_input(filename):
         return f.read()
 
 
-"""
-If return non-zero mean something wrong
-"""
-
-
 def execute(language):
+    """
+    If return non-zero mean something wrong
+    """
     try:
         if (language == "nodejs"):
             intrepreter = "node"
