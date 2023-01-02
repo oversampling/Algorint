@@ -33,7 +33,19 @@ spec:
         - name: router-app
           image: chan1992241/router:latest
           imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: router-configmap
+            - secretRef:
+                name: router-secrets
           ports:
             - containerPort: 8080
               name: http
               protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router-configmap
+data:
+  REDIS_SENTINELS: sentinel-0:5000,sentinel-1:5000,sentinel-2:5000

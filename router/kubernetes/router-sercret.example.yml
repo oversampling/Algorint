@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: router-secrets
+type: Opaque
+data:
+  REDIS_PASSWORD:
+  REDIS_MASTER_NAME:
