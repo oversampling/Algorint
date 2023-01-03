@@ -21,7 +21,7 @@ redis_password = os.environ.get('REDIS_PASSWORD')
 
 redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
 redis_master = redis_sentinel.master_for(
-    redis_master_name, password=redis_password, socket_timeout=5)
+    redis_master_name.strip(), password=redis_password.strip(), socket_timeout=5)
 
 
 def execute_command(command, *args):
