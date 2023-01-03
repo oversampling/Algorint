@@ -16,8 +16,4 @@ RUN pip3 install -r requirements.txt
 
 COPY . /app
 
-ENV CEE_INTERPRETER_QUEUE=cee-intrepreter-queue.default
-
-ENV CEE_INTERPRETER_QUEUE_NAME=cee-intrepreter-queue
-
 CMD ["python3", "main.py"]

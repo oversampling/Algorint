@@ -125,11 +125,11 @@ def execute(language):
 
 
 connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host=os.getenv("CEE_INTERPRETER_QUEUE")))
+    pika.ConnectionParameters(host=os.getenv("CEE_INTERPRETER_QUEUE").strip()))
 channel = connection.channel()
 channel.basic_qos(prefetch_count=1)
 channel.queue_declare(queue=os.getenv(
-    "CEE_INTERPRETER_QUEUE_NAME"), durable=True)
+    "CEE_INTERPRETER_QUEUE_NAME").strip(), durable=True)
 print(' [*] Waiting for messages. To exit press CTRL+C')
 channel.basic_consume(queue='cee-intrepreter-queue',
                       on_message_callback=callback)

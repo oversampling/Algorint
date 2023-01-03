@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: router-service
+  namespace: router
 spec:
   selector:
     app: router-app
@@ -19,6 +20,7 @@ metadata:
   labels:
     app: router-app
   name: router-app
+  namespace: router
 spec:
   replicas: 1
   selector:
@@ -47,5 +49,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: router-configmap
+  namespace: router
 data:
-  REDIS_SENTINELS: sentinel-0:5000,sentinel-1:5000,sentinel-2:5000
+  CEE_INTERPRETER_QUEUE: cee-intrepreter-queue.cee-intrepreter.svc.cluster.local
+  CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue

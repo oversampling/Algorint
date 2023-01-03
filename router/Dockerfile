@@ -12,10 +12,6 @@ EXPOSE 8080
 
 ENV PORT=8080
 
-ENV CEE_INTERPRETER_QUEUE=cee-intrepreter-queue.default
-
-ENV CEE_INTERPRETER_QUEUE_NAME=cee-intrepreter-queue
-
 ENTRYPOINT [ "python" ]
 
 CMD [ "main.py" ]
