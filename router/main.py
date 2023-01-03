@@ -57,7 +57,7 @@ def make_submission():
     test_cases = request.form.get('test_cases')
     input = request.form.get('input')
     # Save to submission database
-    submission_id = uuid.uuid4()
+    submission_id = str(uuid.uuid4())
     submission = {
         "status": "pending",
     }
