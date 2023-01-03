@@ -43,3 +43,15 @@ spec:
             requests:
               memory: "128Mi"
               cpu: 500m
+          envFrom:
+            - configMapRef:
+                name: cee-intrepreter-configmap
+            - secretRef:
+                name: cee-intrepreter-secrets
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cee-intrepreter-configmap
+data:
+  REDIS_SENTINELS: sentinel-0:5000,sentinel-1:5000,sentinel-2:5000

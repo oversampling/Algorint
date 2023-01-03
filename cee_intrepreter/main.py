@@ -5,8 +5,34 @@ import json
 import subprocess
 import os
 from dotenv import load_dotenv
+from redis.sentinel import Sentinel
+import time
+import redis
 
 load_dotenv()
+
+redis_sentinels = "sentinel.redis.svc.cluster.local"
+redis_master_name = os.environ.get('REDIS_MASTER_NAME')
+redis_password = os.environ.get('REDIS_PASSWORD')
+
+redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
+redis_master = redis_sentinel.master_for(
+    redis_master_name.strip(), password=redis_password.strip(), socket_timeout=5)
+
+
+def execute_command(command, *args):
+    max_retries = 2
+    count = 0
+    backoffSeconds = 2
+    while True:
+        try:
+            return command(*args)
+        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
+            count += 1
+            if count > max_retries:
+                raise
+        print('Retrying in {} seconds'.format(backoffSeconds))
+        time.sleep(backoffSeconds)
 
 
 def callback(ch, method, properties, body):
@@ -18,7 +44,16 @@ def callback(ch, method, properties, body):
     save_input(data["input"])
     # Execute the code
     return_code = execute(data["language"])
-    # TODO: Save the result to submission database
+    # Save the result to submission database
+    submission = {
+        "status": "done",
+        "stdout": read_file("stdout.txt"),
+        "stderr": read_file("stderr.txt"),
+        "return_code": return_code
+    }
+    execute_command(redis_master.set,
+                    data["submission_id"], json.dumps(submission))
+    # Clean up
     clean_up(data["language"])
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -61,7 +96,7 @@ def save_input(input):
         f.write(input)
 
 
-def read_input(filename):
+def read_file(filename):
     with open(filename, "r") as f:
         return f.read()
 
@@ -78,7 +113,7 @@ def execute(language):
             intrepreter = "python3"
             extension = ".py"
         result = subprocess.run(
-            [intrepreter, f"code{extension}"], capture_output=True, text=True, timeout=5, input=read_input("input.txt"))
+            [intrepreter, f"code{extension}"], capture_output=True, text=True, timeout=5, input=read_file("input.txt"))
     except subprocess.TimeoutExpired:
         result.returncode = 1
         save_stderr("Time limit exceeded")
