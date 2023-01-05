@@ -36,21 +36,36 @@ def execute_command(command, *args):
 
 
 def callback(ch, method, properties, body):
+    """
+    body attribute is JSON object with schema shown below
+    {
+        "langauage": <programming language: str>,
+        "code": <user code: str>,
+        "input": [<stdin stream: str>]
+    }
+    """
     print(" [x] Received %r" % body.decode())
     data = json.loads(body.decode())
     # Save the code, input to a file
     save_code(data["code"], data["language"])
-    # TODO: handle multiple input file
-    save_input(data["input"])
-    # Execute the code
-    return_code = execute(data["language"])
-    # Save the result to submission database
+    # handle multiple input file
     submission = {
-        "status": "done",
-        "stdout": read_file("stdout.txt"),
-        "stderr": read_file("stderr.txt"),
-        "return_code": return_code
+        "stdout": [],
+        "stderr": []
     }
+    for code_jnput in data["input"]:
+        save_input(code_jnput)
+        # Execute the code
+        execute(data["language"])
+        submission["stderr"].append(
+            read_file("stderr.txt"))
+        submission["stdout"].append(
+            read_file("stdout.txt"))
+        # Clean Up stderr and stdout file
+        cleanup_stdout()
+        cleanup_stderr()
+    submission["status"] = "done execution"
+    # Save the result to submission database
     execute_command(redis_master.set,
                     data["submission_id"], json.dumps(submission))
     # Clean up
@@ -58,9 +73,19 @@ def callback(ch, method, properties, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
+def cleanup_stdout():
+    if os.path.exists("stdout.txt"):
+        os.remove("stdout.txt")
+
+
+def cleanup_stderr():
+    if os.path.exists("stderr.txt"):
+        os.remove("stderr.txt")
+
+
 def clean_up(langauge):
-    os.remove("stderr.txt")
-    os.remove("stdout.txt")
+    cleanup_stdout()
+    cleanup_stdout()
     os.remove("input.txt")
     if (langauge == "nodejs"):
         os.remove("code.js")

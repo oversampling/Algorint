@@ -51,11 +51,21 @@ def check_redis():
 
 @app.route('/make_submission', methods=['POST'])
 def make_submission():
+    """
+    request body schema
+    {
+        "language": <str>,
+        "code": <str>,
+        "input": [<str>],
+        "test_cases" [<str>]
+    }
+    """
     # Retrieve submission data
-    language = request.form.get('language')
-    code = request.form.get('code')
-    test_cases = request.form.get('test_cases')
-    input = request.form.get('input')
+    data = request.get_json()
+    language = data["language"]
+    code = data["code"]
+    input = data["input"]
+    test_cases = data["test_cases"]
     # Save to submission database
     submission_id = str(uuid.uuid4())
     submission = {
@@ -63,9 +73,9 @@ def make_submission():
     }
     execute_command(redis_master.set, submission_id, json.dumps(submission))
     # Add submission to queue
-    if (request.form.get('language') is None):
+    if (language is None):
         abort(400)
-    if (request.form.get("language") in ["python", "javascript"]):
+    if (language in ["python", "javascript"]):
         cee_intrepreter_submission(
             language, code, input, submission_id)
     # TODO: make judgement once the submission is done execute
@@ -73,6 +83,12 @@ def make_submission():
 
 
 def cee_intrepreter_submission(language, code, input, submission_id):
+    """
+    language: str
+    code: str
+    input: ["test case input stream"]
+    submission_id: "id that store in submission database"
+    """
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(host=os.getenv("CEE_INTERPRETER_QUEUE")))
     channel = connection.channel()
