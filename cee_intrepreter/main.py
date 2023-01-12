@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from redis.sentinel import Sentinel
 import time
 import redis
+import requests
 
 load_dotenv()
 
@@ -42,6 +43,7 @@ def callback(ch, method, properties, body):
         "langauage": <programming language: str>,
         "code": <user code: str>,
         "input": [<stdin stream: str>]
+        "test_cases": [expected output: str]
     }
     """
     print(" [x] Received %r" % body.decode())
@@ -51,7 +53,8 @@ def callback(ch, method, properties, body):
     # handle multiple input file
     submission = {
         "stdout": [],
-        "stderr": []
+        "stderr": [],
+        "test_cases": data["test_cases"]
     }
     for code_jnput in data["input"]:
         save_input(code_jnput)
@@ -68,9 +71,17 @@ def callback(ch, method, properties, body):
     # Save the result to submission database
     execute_command(redis_master.set,
                     data["submission_id"], json.dumps(submission))
+    # Send the output to judge
+    judge(data["submission_id"])
     # Clean up
     clean_up(data["language"])
     ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def judge(submission_id: int):
+    result = requests.post(
+        "http://judge.judge.svc.cluster.local/judge", json={"submission_id": submission_id})
+    return result.status_code
 
 
 def cleanup_stdout():

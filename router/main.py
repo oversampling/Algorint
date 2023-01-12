@@ -77,12 +77,12 @@ def make_submission():
         abort(400)
     if (language in ["python", "javascript"]):
         cee_intrepreter_submission(
-            language, code, input, submission_id)
+            language, code, input, test_cases, submission_id)
     # TODO: make judgement once the submission is done execute
     return redirect(url_for('main'))
 
 
-def cee_intrepreter_submission(language, code, input, submission_id):
+def cee_intrepreter_submission(language, code, input, test_cases, submission_id):
     """
     language: str
     code: str
@@ -95,7 +95,7 @@ def cee_intrepreter_submission(language, code, input, submission_id):
     channel.queue_declare(queue=os.getenv(
         "CEE_INTERPRETER_QUEUE_NAME"), durable=True)
     message = {"language": language, "code": code,
-               "input": input, "submission_id": submission_id}
+               "input": input, "test_cases": test_cases, "submission_id": submission_id}
     channel.basic_publish(
         exchange='',
         routing_key=os.getenv("CEE_INTERPRETER_QUEUE_NAME"),
