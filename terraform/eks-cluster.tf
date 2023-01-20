@@ -35,4 +35,5 @@ module "eks" {
       desired_size = 1
     }
   }
+  node_security_group_id = aws_security_group.algorint-redis.id
 }

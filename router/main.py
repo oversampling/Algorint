@@ -19,9 +19,11 @@ redis_master_name = os.environ.get('REDIS_MASTER_NAME')
 redis_password = os.environ.get('REDIS_PASSWORD')
 
 
-redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
-redis_master = redis_sentinel.master_for(
-    redis_master_name.strip(), password=redis_password.strip(), socket_timeout=5)
+# redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
+# redis_master = redis_sentinel.master_for(
+#     redis_master_name.strip(), password=redis_password.strip(), socket_timeout=5)
+redis_master = redis.Redis(
+    host=os.getenv("REDIS_HOST").strip(), port=6379)
 
 
 def execute_command(command, *args):
