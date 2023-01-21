@@ -29,3 +29,18 @@ resource "aws_security_group" "algorint-redis" {
     ]
   }
 }
+resource "aws_security_group" "algorint-rabbitmq" {
+  name   = "algorint-rabbitmq"
+  vpc_id = module.vpc.vpc_id
+
+  ingress {
+    from_port = 5671
+    to_port   = 5671
+    protocol  = "tcp"
+
+    cidr_blocks = [
+      "10.0.1.0/24",
+      "10.0.2.0/24",
+    ]
+  }
+}
