@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import pika
-import sys
 import os
 import json
 from flask import Flask
@@ -11,19 +10,46 @@ import time
 import redis
 import uuid
 
-sentinels = []
+
+def initialize_submission_database():
+    redis_master = None
+    if (os.getenv("ENVIRONMENT") == "development"):
+        redis_sentinels = os.getenv("REDIS_SENTINELS").strip()
+        redis_master_name = os.environ.get('REDIS_MASTER_NAME').strip()
+        redis_password = os.environ.get('REDIS_PASSWORD').strip()
+        redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
+        redis_master = redis_sentinel.master_for(
+            redis_master_name, password=redis_password, socket_timeout=5)
+
+    elif (os.getenv("ENVIRONMENT") == "production"):
+        redis_master = redis.Redis(
+            host=os.getenv("REDIS_HOST").strip(), port=6379)
+
+    return redis_master
 
 
-redis_sentinels = "sentinel.redis.svc.cluster.local"
-redis_master_name = os.environ.get('REDIS_MASTER_NAME')
-redis_password = os.environ.get('REDIS_PASSWORD')
-
-
-# redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
-# redis_master = redis_sentinel.master_for(
-#     redis_master_name.strip(), password=redis_password.strip(), socket_timeout=5)
-redis_master = redis.Redis(
-    host=os.getenv("REDIS_HOST").strip(), port=6379)
+def enqueue_submission(data, queue_name):
+    if (os.getenv("ENVIRONMENT") == "development"):
+        rabbitmq_url = os.getenv("SUBMISSION_QUEUE").strip()
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(host=rabbitmq_url))
+        queue_channel = connection.channel()
+        queue_channel.queue_declare(queue=queue_name, durable=True)
+        queue_channel.basic_publish(exchange='',
+                                    routing_key=queue_name,
+                                    body=json.dumps(data))
+        connection.close()
+    elif (os.getenv("ENVIRONMENT") == "production"):
+        rabbitmq_url = os.getenv("SUBMISSION_QUEUE").strip()
+        parameters = pika.URLParameters(rabbitmq_url)
+        connection = pika.BlockingConnection(parameters)
+        queue_channel = connection.channel()
+        queue_channel.queue_declare(queue=queue_name, durable=True)
+        queue_channel.basic_publish(exchange='',
+                                    routing_key=queue_name,
+                                    body=json.dumps(data))
+        connection.close()
+    pass
 
 
 def execute_command(command, *args):
@@ -43,6 +69,7 @@ def execute_command(command, *args):
 
 load_dotenv()
 app = Flask(__name__)
+redis_master = initialize_submission_database()
 
 
 @app.route('/check_redis', methods=['GET'])
@@ -80,7 +107,6 @@ def make_submission():
     if (language in ["python", "javascript"]):
         cee_intrepreter_submission(
             language, code, input, test_cases, submission_id)
-    # TODO: make judgement once the submission is done execute
     return redirect(url_for('main'))
 
 
@@ -91,18 +117,11 @@ def cee_intrepreter_submission(language, code, input, test_cases, submission_id)
     input: ["test case input stream"]
     submission_id: "id that store in submission database"
     """
-    connection = pika.BlockingConnection(
-        pika.ConnectionParameters(host=os.getenv("CEE_INTERPRETER_QUEUE")))
-    channel = connection.channel()
-    channel.queue_declare(queue=os.getenv(
-        "CEE_INTERPRETER_QUEUE_NAME"), durable=True)
+    cee_interpreter_queue_name = os.getenv(
+        "CEE_INTERPRETER_QUEUE_NAME").strip()
     message = {"language": language, "code": code,
                "input": input, "test_cases": test_cases, "submission_id": submission_id}
-    channel.basic_publish(
-        exchange='',
-        routing_key=os.getenv("CEE_INTERPRETER_QUEUE_NAME"),
-        body=json.dumps(message))
-    connection.close()
+    enqueue_submission(message, cee_interpreter_queue_name)
 
 
 @app.route('/')

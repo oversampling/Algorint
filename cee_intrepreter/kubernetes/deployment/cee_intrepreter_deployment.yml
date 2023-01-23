@@ -57,6 +57,5 @@ metadata:
   name: cee-intrepreter-configmap
   namespace: cee-intrepreter
 data:
-  REDIS_SENTINELS: sentinel-0:5000,sentinel-1:5000,sentinel-2:5000
-  CEE_INTERPRETER_QUEUE: cee-intrepreter-queue.cee-intrepreter.svc.cluster.local
   CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  ENVIRONMENT: production

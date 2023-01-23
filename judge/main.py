@@ -2,21 +2,28 @@
 import os
 from flask import Flask
 from dotenv import load_dotenv
-from flask import abort, redirect, url_for, request
+from flask import request
 from redis.sentinel import Sentinel
 import time
 import redis
 import json
 
 
-redis_sentinels = "sentinel.redis.svc.cluster.local"
-redis_master_name = os.environ.get('REDIS_MASTER_NAME')
-redis_password = os.environ.get('REDIS_PASSWORD')
+def initialize_submission_database():
+    redis_master = None
+    if (os.getenv("ENVIRONMENT") == "development"):
+        redis_sentinels = os.getenv("REDIS_SENTINELS").strip()
+        redis_master_name = os.environ.get('REDIS_MASTER_NAME').strip()
+        redis_password = os.environ.get('REDIS_PASSWORD').strip()
+        redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
+        redis_master = redis_sentinel.master_for(
+            redis_master_name, password=redis_password, socket_timeout=5)
 
+    elif (os.getenv("ENVIRONMENT") == "production"):
+        redis_master = redis.Redis(
+            host=os.getenv("REDIS_HOST").strip(), port=6379)
 
-redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
-redis_master = redis_sentinel.master_for(
-    redis_master_name.strip(), password=redis_password.strip(), socket_timeout=5)
+    return redis_master
 
 
 def execute_command(command, *args):
@@ -36,6 +43,7 @@ def execute_command(command, *args):
 
 load_dotenv()
 app = Flask(__name__)
+redis_master = initialize_submission_database()
 
 
 @app.route('/judge', methods=['POST'])

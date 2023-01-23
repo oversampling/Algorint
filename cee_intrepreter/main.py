@@ -10,15 +10,34 @@ import time
 import redis
 import requests
 
+
+def initialize():
+    redis_master, channel, connection = None, None, None
+    if (os.getenv("ENVIRONMENT") == "development"):
+        redis_sentinels = os.getenv("REDIS_SENTINELS").strip()
+        redis_master_name = os.environ.get('REDIS_MASTER_NAME').strip()
+        redis_password = os.environ.get('REDIS_PASSWORD').strip()
+        submission_queue = os.getenv("SUBMISSION_QUEUE").strip()
+        redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
+        redis_master = redis_sentinel.master_for(
+            redis_master_name, password=redis_password, socket_timeout=5)
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(host=submission_queue))
+        channel = connection.channel()
+
+    elif (os.getenv("ENVIRONMENT") == "production"):
+        rabbitmq_url = os.getenv("SUBMISSION_QUEUE").strip()
+        parameters = pika.URLParameters(rabbitmq_url)
+        connection = pika.BlockingConnection(parameters)
+        channel = connection.channel()
+        redis_master = redis.Redis(
+            host=os.getenv("REDIS_HOST").strip(), port=6379)
+
+    return redis_master, channel, connection
+
+
 load_dotenv()
-
-redis_sentinels = "sentinel.redis.svc.cluster.local"
-redis_master_name = os.environ.get('REDIS_MASTER_NAME')
-redis_password = os.environ.get('REDIS_PASSWORD')
-
-redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
-redis_master = redis_sentinel.master_for(
-    redis_master_name.strip(), password=redis_password.strip(), socket_timeout=5)
+redis_master, queue_channel, rabbitmq_connection = initialize()
 
 
 def execute_command(command, *args):
@@ -160,13 +179,10 @@ def execute(language):
     return result.returncode
 
 
-connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host=os.getenv("CEE_INTERPRETER_QUEUE").strip()))
-channel = connection.channel()
-channel.basic_qos(prefetch_count=1)
-channel.queue_declare(queue=os.getenv(
+queue_channel.basic_qos(prefetch_count=1)
+queue_channel.queue_declare(queue=os.getenv(
     "CEE_INTERPRETER_QUEUE_NAME").strip(), durable=True)
 print(' [*] Waiting for messages. To exit press CTRL+C')
-channel.basic_consume(queue='cee-intrepreter-queue',
-                      on_message_callback=callback)
-channel.start_consuming()
+queue_channel.basic_consume(queue='cee-intrepreter-queue',
+                            on_message_callback=callback)
+queue_channel.start_consuming()

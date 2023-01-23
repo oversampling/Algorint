@@ -1,0 +1,6 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: cee-intrepreter
+  labels:
+    name: cee-intrepreter

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: router-secrets
+  namespace: router
+type: Opaque
+data:
+  REDIS_HOST:
+  SUBMISSION_QUEUE: <RabbitMQ URL> amqps://algorint:algorint-rabbitmq-password-21012023@b-d3bcfae3-51db-4a69-9d45-ce2badef3bd8.mq.ap-southeast-1.amazonaws.com:5671

@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cee-intrepreter-service
+  namespace: cee-intrepreter
+spec:
+  type: ClusterIP
+  selector:
+    app: cee-intrepreter
+  ports:
+    - name: http
+      protocol: TCP
+      port: 15672
+      targetPort: 15672
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: 5672
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cee-intrepreter
+  name: cee-intrepreter
+  namespace: cee-intrepreter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cee-intrepreter
+  template:
+    metadata:
+      labels:
+        app: cee-intrepreter
+    spec:
+      containers:
+        - name: cee-intrepreter
+          image: chan1992241/cee-intrepreter:latest
+          imagePullPolicy: Always
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: 500m
+            requests:
+              memory: "128Mi"
+              cpu: 500m
+          envFrom:
+            - configMapRef:
+                name: cee-intrepreter-configmap
+            - secretRef:
+                name: cee-intrepreter-secrets
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cee-intrepreter-configmap
+  namespace: cee-intrepreter
+data:
+  REDIS_SENTINELS: sentinel.redis.svc.cluster.local
+  SUBMISSION_QUEUE: submission-queue.submission-queue.svc.cluster.local
+  CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  ENVIRONMENT: development

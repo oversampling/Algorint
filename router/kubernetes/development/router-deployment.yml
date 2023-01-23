@@ -51,5 +51,7 @@ metadata:
   name: router-configmap
   namespace: router
 data:
-  CEE_INTERPRETER_QUEUE: cee-intrepreter-queue.cee-intrepreter.svc.cluster.local
   CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  SUBMISSION_QUEUE: submission-queue.submission-queue.svc.cluster.local
+  REDIS_SENTINELS: sentinel.redis.svc.cluster.local
+  ENVIRONMENT: development

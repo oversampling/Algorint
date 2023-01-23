@@ -1,12 +1,19 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: submission-queue
+  labels:
+    name: submission-queue
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: cee-intrepreter-queue
-  namespace: cee-intrepreter
+  name: submission-queue
+  namespace: submission-queue
 spec:
   type: ClusterIP
   selector:
-    app: cee-intrepreter-queue
+    app: submission-queue
   ports:
     - name: http
       protocol: TCP
@@ -20,16 +27,16 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: cee-intrepreter-queue-configmap
-  namespace: cee-intrepreter
+  name: submission-queue-configmap
+  namespace: submission-queue
 data:
   PLACEHOLDER: "NONE"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: cee-intrepreter-queue-pvc
-  namespace: cee-intrepreter
+  name: submission-queue-pvc
+  namespace: submission-queue
 spec:
   accessModes:
     - ReadWriteOnce
@@ -41,8 +48,8 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: cee-intrepreter-queue-secret
-  namespace: cee-intrepreter
+  name: submission-queue-secret
+  namespace: submission-queue
 stringData:
   PLACEHOLDER: "NONE"
 type: Opaque
@@ -50,17 +57,17 @@ type: Opaque
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: cee-intrepreter-queue
-  namespace: cee-intrepreter
+  name: submission-queue
+  namespace: submission-queue
 spec:
   serviceName: "not-applicable"
   selector:
     matchLabels:
-      app: cee-intrepreter-queue
+      app: submission-queue
   template:
     metadata:
       labels:
-        app: cee-intrepreter-queue
+        app: submission-queue
     spec:
       containers:
         - name: rabbitmq
@@ -74,13 +81,13 @@ spec:
               containerPort: 5672
           envFrom:
             - configMapRef:
-                name: cee-intrepreter-queue-configmap
+                name: submission-queue-configmap
             - secretRef:
-                name: cee-intrepreter-queue-secret
+                name: submission-queue-secret
           volumeMounts:
             - mountPath: "/var/lib/rabbitmq"
-              name: cee-intrepreter-queue-volume
+              name: submission-queue-volume
       volumes:
-        - name: cee-intrepreter-queue-volume
+        - name: submission-queue-volume
           persistentVolumeClaim:
-            claimName: cee-intrepreter-queue-pvc
+            claimName: submission-queue-pvc

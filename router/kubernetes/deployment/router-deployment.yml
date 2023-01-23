@@ -1,0 +1,57 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router-service
+  namespace: router
+spec:
+  selector:
+    app: router-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+      name:
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: router-app
+  name: router-app
+  namespace: router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: router-app
+  template:
+    metadata:
+      labels:
+        app: router-app
+    spec:
+      containers:
+        - name: router-app
+          image: chan1992241/router:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: router-configmap
+            - secretRef:
+                name: router-secrets
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+      nodeSelector:
+        hostname: node1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router-configmap
+  namespace: router
+data:
+  CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  ENVIRONMENT: production
