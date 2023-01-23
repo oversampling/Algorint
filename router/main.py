@@ -4,7 +4,7 @@ import os
 import json
 from flask import Flask
 from dotenv import load_dotenv
-from flask import abort, redirect, url_for, request
+from flask import abort, jsonify, request
 from redis.sentinel import Sentinel
 import time
 import redis
@@ -78,6 +78,14 @@ def check_redis():
     return execute_command(redis_master.get, 'key')
 
 
+@app.route("/retrieve_submission/<submission_id>", methods=['GET'])
+def retrieve_submission(submission_id):
+    submission = execute_command(redis_master.get, submission_id)
+    if (submission is None):
+        return jsonify({"error": "submission not found"}), 200
+    return json.loads(submission), 200
+
+
 @app.route('/make_submission', methods=['POST'])
 def make_submission():
     """
@@ -107,7 +115,7 @@ def make_submission():
     if (language in ["python", "javascript"]):
         cee_intrepreter_submission(
             language, code, input, test_cases, submission_id)
-    return redirect(url_for('main'))
+    return submission_id
 
 
 def cee_intrepreter_submission(language, code, input, test_cases, submission_id):
