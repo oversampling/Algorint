@@ -16,19 +16,3 @@ resource "aws_elasticache_replication_group" "algorint" {
   security_group_ids          = [aws_security_group.algorint-redis.id]
   subnet_group_name           = aws_elasticache_subnet_group.submission_database.name
 }
-
-# module "redis" {
-#   source = "github.com/terraform-community-modules/tf_aws_elasticache_redis.git?ref=v2.2.0"
-
-#   env               = "dev"
-#   name              = "thtest"
-#   redis_clusters    = "2"
-#   redis_failover    = "true"
-#   redis_node_type   = "cache.t2.small"
-#   subnets           = module.vpc.private_subnets
-#   vpc_id            = module.vpc.vpc_id
-#   apply_immediately = true
-#   security_group_names = [
-#     aws_security_group.redis_sc.name
-#   ]
-# }

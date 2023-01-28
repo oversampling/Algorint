@@ -18,19 +18,9 @@ output "cluster_name" {
   value       = module.eks.cluster_name
 }
 
-output "efs_id" {
-  description = "EFS ID"
-  value       = aws_efs_file_system.algorint.id
-}
-
 output "redis_primary_endpoint_address" {
   description = "Redis primary endpoint address"
   value       = aws_elasticache_replication_group.algorint.primary_endpoint_address
-}
-
-output "redis_configuration_endpoint_address" {
-  description = "Redis configuration endpoint address"
-  value       = aws_elasticache_replication_group.algorint.configuration_endpoint_address
 }
 
 output "rabbitmq_endpoint" {

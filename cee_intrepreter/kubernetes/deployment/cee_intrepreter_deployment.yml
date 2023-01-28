@@ -50,6 +50,8 @@ spec:
                 name: cee-intrepreter-configmap
             - secretRef:
                 name: cee-intrepreter-secrets
+      nodeSelector:
+        hostname: node2
 ---
 apiVersion: v1
 kind: ConfigMap

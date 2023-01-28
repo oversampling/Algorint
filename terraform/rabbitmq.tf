@@ -6,7 +6,7 @@ resource "aws_mq_broker" "algorint-rabbitmq" {
   host_instance_type  = "mq.t3.micro"
   security_groups     = [aws_security_group.algorint-rabbitmq.id]
   deployment_mode     = "SINGLE_INSTANCE"
-  publicly_accessible = true
+  publicly_accessible = false
   subnet_ids          = [module.vpc.private_subnets[0]]
   user {
     username = "algorint"

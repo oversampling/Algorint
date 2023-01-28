@@ -38,10 +38,14 @@ spec:
           envFrom:
             - secretRef:
                 name: judge-secrets
+            - configMapRef:
+                name: judge-configmap
           ports:
             - containerPort: 8080
               name: http
               protocol: TCP
+      nodeSelector:
+        hostname: node1
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -49,4 +53,4 @@ metadata:
   name: judge-configmap
   namespace: judge
 data:
-  ENVIRONMENT: development
+  ENVIRONMENT: production
