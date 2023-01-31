@@ -17,7 +17,9 @@ module "eks" {
   eks_managed_node_groups = {
     one = {
       name = "node-group-2"
-
+      labels = {
+        hostname = "node1"
+      }
       instance_types = ["t3.small"]
 
       min_size     = 1
@@ -27,7 +29,9 @@ module "eks" {
 
     two = {
       name = "node-group-1"
-
+      labels = {
+        hostname = "node2"
+      }
       instance_types = ["t3.small"]
 
       min_size     = 1

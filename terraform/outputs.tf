@@ -32,3 +32,8 @@ output "rabbitmq_console_url" {
   description = "RabbitMQ console endpoint"
   value       = aws_mq_broker.algorint-rabbitmq.instances[0].console_url
 }
+
+output "router-loadbalancer-dns" {
+  description = "Router loadbalancer DNS"
+  value       = kubernetes_service.router.status.0.load_balancer.0.ingress.0.hostname
+}
