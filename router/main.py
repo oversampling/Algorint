@@ -28,6 +28,14 @@ def initialize_submission_database():
     return redis_master
 
 
+def inject_username_password_to_rabbitmq_url(rabbitmq_url):
+    username = os.getenv("RABBITMQ_USERNAME").strip()
+    password = os.getenv("RABBITMQ_PASSWORD").strip()
+    rabbitmq_url = rabbitmq_url.replace(
+        "amqps://", "amqps://{}:{}@".format(username, password))
+    return rabbitmq_url
+
+
 def enqueue_submission(data, queue_name):
     if (os.getenv("ENVIRONMENT") == "development"):
         rabbitmq_url = os.getenv("SUBMISSION_QUEUE").strip()
@@ -40,7 +48,8 @@ def enqueue_submission(data, queue_name):
                                     body=json.dumps(data))
         connection.close()
     elif (os.getenv("ENVIRONMENT") == "production"):
-        rabbitmq_url = os.getenv("SUBMISSION_QUEUE").strip()
+        rabbitmq_url = inject_username_password_to_rabbitmq_url(
+            os.getenv("SUBMISSION_QUEUE").strip())
         parameters = pika.URLParameters(rabbitmq_url)
         connection = pika.BlockingConnection(parameters)
         queue_channel = connection.channel()

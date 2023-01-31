@@ -11,6 +11,14 @@ import redis
 import requests
 
 
+def inject_username_password_to_rabbitmq_url(rabbitmq_url):
+    username = os.getenv("RABBITMQ_USERNAME").strip()
+    password = os.getenv("RABBITMQ_PASSWORD").strip()
+    rabbitmq_url = rabbitmq_url.replace(
+        "amqps://", "amqps://{}:{}@".format(username, password))
+    return rabbitmq_url
+
+
 def initialize():
     redis_master, channel, connection = None, None, None
     if (os.getenv("ENVIRONMENT") == "development"):
@@ -26,7 +34,8 @@ def initialize():
         channel = connection.channel()
 
     elif (os.getenv("ENVIRONMENT") == "production"):
-        rabbitmq_url = os.getenv("SUBMISSION_QUEUE").strip()
+        rabbitmq_url = inject_username_password_to_rabbitmq_url(
+            os.getenv("SUBMISSION_QUEUE").strip())
         parameters = pika.URLParameters(rabbitmq_url)
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()

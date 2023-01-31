@@ -5,5 +5,7 @@ metadata:
   namespace: router
 type: Opaque
 data:
-  REDIS_HOST:
-  SUBMISSION_QUEUE: <RabbitMQ URL> amqps://algorint:algorint-rabbitmq-password-21012023@b-d3bcfae3-51db-4a69-9d45-ce2badef3bd8.mq.ap-southeast-1.amazonaws.com:5671
+  REDIS_HOST: YWxnb3JpbnQtY2x1c3Rlci5hNWJtY3kubmcuMDAwMS5hcHNlMS5jYWNoZS5hbWF6b25hd3MuY29t
+  SUBMISSION_QUEUE: amqps://b-d3bcfae3-51db-4a69-9d45-ce2badef3bd8.mq.ap-southeast-1.amazonaws.com:5671
+  RABBITMQ_USERNAME: base64(algorint)
+  RABBITMQ_PASSWORD: base64(algorint-rabbitmq-password-21012023)
