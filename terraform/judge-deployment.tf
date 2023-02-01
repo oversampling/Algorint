@@ -15,6 +15,9 @@ resource "kubernetes_config_map" "judge" {
   data = {
     ENVIRONMENT = "production"
   }
+  depends_on = [
+    kubernetes_namespace.judge
+  ]
 }
 
 resource "kubernetes_secret" "judge" {
@@ -26,6 +29,9 @@ resource "kubernetes_secret" "judge" {
     REDIS_HOST = aws_elasticache_replication_group.algorint.primary_endpoint_address
   }
   type = "Opaque"
+  depends_on = [
+    kubernetes_namespace.judge
+  ]
 }
 
 resource "kubernetes_deployment" "judge" {
@@ -104,6 +110,9 @@ resource "kubernetes_service" "judge" {
       app = "judge"
     }
   }
+  depends_on = [
+    kubernetes_namespace.judge
+  ]
   spec {
     selector = {
       app = "judge"

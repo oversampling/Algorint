@@ -16,6 +16,9 @@ resource "kubernetes_config_map" "cee-interpreter" {
     CEE_INTERPRETER_QUEUE_NAME = "cee-intrepreter-queue"
     ENVIRONMENT                = "production"
   }
+  depends_on = [
+    kubernetes_namespace.cee-interpreter
+  ]
 }
 
 resource "kubernetes_secret" "cee-interpreter" {
@@ -30,6 +33,9 @@ resource "kubernetes_secret" "cee-interpreter" {
     RABBITMQ_PASSWORD = var.rabbitmq-password
   }
   type = "Opaque"
+  depends_on = [
+    kubernetes_namespace.cee-interpreter
+  ]
 }
 
 resource "kubernetes_deployment" "cee-interpreter" {
@@ -92,5 +98,6 @@ resource "kubernetes_deployment" "cee-interpreter" {
   depends_on = [
     kubernetes_config_map.cee-interpreter,
     kubernetes_secret.cee-interpreter
+    kubernetes_namespace.cee-interpreter
   ]
 }

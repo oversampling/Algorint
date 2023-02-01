@@ -16,6 +16,9 @@ resource "kubernetes_config_map" "router" {
     CEE_INTERPRETER_QUEUE_NAME = "cee-intrepreter-queue"
     ENVIRONMENT                = "production"
   }
+  depends_on = [
+    kubernetes_config_map.router
+  ]
 }
 
 resource "kubernetes_secret" "router" {
@@ -29,6 +32,9 @@ resource "kubernetes_secret" "router" {
     RABBITMQ_USERNAME = var.rabbitmq-username
     RABBITMQ_PASSWORD = var.rabbitmq-password
   }
+  depends_on = [
+    kubernetes_config_map.router
+  ]
   type = "Opaque"
 }
 
@@ -119,4 +125,7 @@ resource "kubernetes_service" "router" {
     }
     type = "LoadBalancer"
   }
+  depends_on = [
+    kubernetes_config_map.router
+  ]
 }
