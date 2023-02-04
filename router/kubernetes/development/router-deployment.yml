@@ -52,6 +52,7 @@ metadata:
   namespace: router
 data:
   CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  CEE_COMPILER_QUEUE_NAME: cee-compiler-queue
   SUBMISSION_QUEUE: submission-queue.submission-queue.svc.cluster.local
   REDIS_SENTINELS: sentinel.redis.svc.cluster.local
   ENVIRONMENT: development

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cee-compiler
+  name: cee-compiler
+  namespace: cee-compiler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cee-compiler
+  template:
+    metadata:
+      labels:
+        app: cee-compiler
+    spec:
+      containers:
+        - name: cee-compiler
+          image: chan1992241/cee-compiler:latest
+          imagePullPolicy: Always
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: 500m
+            requests:
+              memory: "128Mi"
+              cpu: 500m
+          envFrom:
+            - configMapRef:
+                name: cee-compiler-configmap
+            - secretRef:
+                name: cee-compiler-secrets
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cee-compiler-configmap
+  namespace: cee-compiler
+data:
+  REDIS_SENTINELS: sentinel.redis.svc.cluster.local
+  SUBMISSION_QUEUE: submission-queue.submission-queue.svc.cluster.local
+  CEE_COMPILER_QUEUE_NAME: cee-compiler-queue
+  ENVIRONMENT: development

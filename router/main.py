@@ -124,6 +124,9 @@ def make_submission():
     if (language in ["python", "javascript"]):
         cee_intrepreter_submission(
             language, code, input, test_cases, submission_id)
+    elif (language in ["c", "cpp", "rust"]):
+        cee_compiler_submission(
+            language, code, input, test_cases, submission_id)
     return submission_id
 
 
@@ -139,6 +142,19 @@ def cee_intrepreter_submission(language, code, input, test_cases, submission_id)
     message = {"language": language, "code": code,
                "input": input, "test_cases": test_cases, "submission_id": submission_id}
     enqueue_submission(message, cee_interpreter_queue_name)
+
+
+def cee_compiler_submission(language, code, input, test_cases, submission_id):
+    """
+    language: str
+    code: str
+    input: ["test case input stream"]
+    submission_id: "id that store in submission database"
+    """
+    cee_compiler_queue_name = os.getenv("CEE_COMPILER_QUEUE_NAME").strip()
+    message = {"language": language, "code": code,
+               "input": input, "test_cases": test_cases, "submission_id": submission_id}
+    enqueue_submission(message, cee_compiler_queue_name)
 
 
 @app.route('/')
