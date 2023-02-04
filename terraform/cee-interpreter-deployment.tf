@@ -97,7 +97,7 @@ resource "kubernetes_deployment" "cee-interpreter" {
   }
   depends_on = [
     kubernetes_config_map.cee-interpreter,
-    kubernetes_secret.cee-interpreter
+    kubernetes_secret.cee-interpreter,
     kubernetes_namespace.cee-interpreter
   ]
 }
