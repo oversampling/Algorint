@@ -56,6 +56,8 @@ def enqueue_submission(data, queue_name):
         queue_channel.queue_declare(queue=queue_name, durable=True)
         queue_channel.basic_publish(exchange='',
                                     routing_key=queue_name,
+                                    properties=pika.BasicProperties(
+                                        expiration='600000'),
                                     body=json.dumps(data))
         connection.close()
     pass
@@ -83,7 +85,7 @@ redis_master = initialize_submission_database()
 
 @app.route('/check_redis', methods=['GET'])
 def check_redis():
-    print(execute_command(redis_master.set, 'key', 'route'))
+    print(execute_command(redis_master.set, 'key', 'route', 10))
     return execute_command(redis_master.get, 'key')
 
 
@@ -117,7 +119,8 @@ def make_submission():
     submission = {
         "status": "pending",
     }
-    execute_command(redis_master.set, submission_id, json.dumps(submission))
+    execute_command(redis_master.set, submission_id,
+                    json.dumps(submission), 600)
     # Add submission to queue
     if (language is None):
         abort(400)

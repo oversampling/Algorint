@@ -98,7 +98,7 @@ def callback(ch, method, properties, body):
     submission["status"] = "done execution"
     # Save the result to submission database
     execute_command(redis_master.set,
-                    data["submission_id"], json.dumps(submission))
+                    data["submission_id"], json.dumps(submission), 600)
     # Send the output to judge
     judge(data["submission_id"])
     # Clean up

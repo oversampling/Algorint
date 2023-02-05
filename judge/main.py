@@ -68,7 +68,8 @@ def make_judge():
         results.append(result)
     # Update submission database
     submission["result"] = results
-    execute_command(redis_master.set, submission_id, json.dumps(submission))
+    execute_command(redis_master.set, submission_id,
+                    json.dumps(submission), 600)
     return "OK", 200
 
 
