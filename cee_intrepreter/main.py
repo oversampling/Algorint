@@ -34,7 +34,7 @@ class Sandbox:
         self.stdin._sock.setblocking(0)
         self.stdin._writing = True
 
-    def write(self, data):
+    def write(self, data: str):
         self.stdin.write(data.encode("utf-8"))
         self.__wait(timeout=2)
 
@@ -116,7 +116,7 @@ class Worker():
         with open(filename, "r") as f:
             return f.read()
 
-    def __execute(self, language):
+    def __execute(self, language) -> tuple[str, str]:
         if (language == "python"):
             sandbox = Sandbox(self.languages[language], self.dind, command="python code.py")
         elif (language == "nodejs"):
@@ -124,14 +124,16 @@ class Worker():
         else:
             return "", "Language not supported"
         # Pass input to stdin
+        data = self.read_file(f'{WORK_DIR}/code/input.txt')
         try:
-            sandbox.write(self.read_file(f'{WORK_DIR}/code/input.txt'))
+            if data is not None:
+                sandbox.write(data + "\n")
         except Exception as e:
             print(sandbox.status())
             return "", e.__str__()
         stdout, stderr = sandbox.output()
         del sandbox
-        return stdout, stderr
+        return stdout.decode(), stderr.decode()
 
     def __save_input(self, input: str):
         """
