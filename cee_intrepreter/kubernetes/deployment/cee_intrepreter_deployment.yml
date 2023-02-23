@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
         - name: cee-intrepreter
-          image: chan1992241/cee-intrepreter:latest
+          image: chan1992241/cee-interpreter:latest
           imagePullPolicy: Always
           resources:
             limits:
