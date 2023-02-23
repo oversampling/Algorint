@@ -3,6 +3,7 @@
 4
 ABBC
 6
+ABACDA
 
 
 Sample Output
