@@ -1,237 +1,330 @@
 #!/usr/bin/env python
+import io
+import tarfile
+from typing import Literal
 import pika
 import time
 import json
-import subprocess
 import os
 from dotenv import load_dotenv
 from redis.sentinel import Sentinel
 import time
 import redis
 import requests
+import docker
 
 
-def inject_username_password_to_rabbitmq_url(rabbitmq_url):
-    username = os.getenv("RABBITMQ_USERNAME").strip()
-    password = os.getenv("RABBITMQ_PASSWORD").strip()
-    rabbitmq_url = rabbitmq_url.replace(
-        "amqps://", "amqps://{}:{}@".format(username, password))
-    return rabbitmq_url
+class Sandbox:
+    def __init__(self, image: str, dind:docker.DockerClient, command: str, timeout:float ,workdir = "/app", cpu_period: int = 1000000, mem_limit: str = "100m", pids_limit: int = 500):
+        self.image = image
+        self.dind = dind
+        self.timeout = timeout
+        self.container = self.dind.containers.create(
+            self.image,
+            command,
+            working_dir=workdir,
+            stdin_open=True,
+            tty=False,
+            detach=True,
+            cpu_period=cpu_period,
+            pids_limit=pids_limit,
+            mem_limit=mem_limit,
+            volumes={f'{workdir}/code': {'bind': workdir, 'mode': 'rw'}})
+        self.container.start()
+        self.stdin = self.container.attach_socket(params={'stdin': 1, 'stdout': 0, 'stderr': 0, 'stream': 1})
+        self.stdin._sock.setblocking(0)
+        self.stdin._writing = True
 
+    def write(self, data: str):
+        self.stdin.write(data.encode("utf-8"))
+        self.__wait(timeout=self.timeout)
 
-def initialize():
-    redis_master, channel, connection = None, None, None
-    if (os.getenv("ENVIRONMENT") == "development"):
-        redis_sentinels = os.getenv("REDIS_SENTINELS").strip()
-        redis_master_name = os.environ.get('REDIS_MASTER_NAME').strip()
-        redis_password = os.environ.get('REDIS_PASSWORD').strip()
-        submission_queue = os.getenv("SUBMISSION_QUEUE").strip()
-        redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
-        redis_master = redis_sentinel.master_for(
-            redis_master_name, password=redis_password, socket_timeout=5)
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=submission_queue))
-        channel = connection.channel()
+    def execute_cmd(self, cmd: str):
+        self.container.exec_run(cmd=cmd)
 
-    elif (os.getenv("ENVIRONMENT") == "production"):
-        rabbitmq_url = inject_username_password_to_rabbitmq_url(
-            os.getenv("SUBMISSION_QUEUE").strip())
-        parameters = pika.URLParameters(rabbitmq_url)
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-        redis_master = redis.Redis(
-            host=os.getenv("REDIS_HOST").strip(), port=6379)
-
-    return redis_master, channel, connection
-
-
-load_dotenv()
-redis_master, queue_channel, rabbitmq_connection = initialize()
-
-
-def execute_command(command, *args):
-    max_retries = 2
-    count = 0
-    backoffSeconds = 2
-    while True:
+    def __wait(self, timeout: int = 2):
         try:
-            return command(*args)
-        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
-            count += 1
-            if count > max_retries:
-                raise
-        print('Retrying in {} seconds'.format(backoffSeconds))
-        time.sleep(backoffSeconds)
+            self.container.wait(timeout=timeout)
+        except Exception:
+            raise
+
+    def output(self):
+        return self.container.logs(stdout=True, stderr=False), self.container.logs(stdout=False, stderr=True)
+
+    @staticmethod
+    def _make_archive(filename: str, data: bytes):
+        tarstream = io.BytesIO()
+        tar = tarfile.open(fileobj=tarstream, mode='w')
+        tarinfo = tarfile.TarInfo(name=filename)
+        tarinfo.size = len(data)
+        tarinfo.mtime = int(time.time())
+        tar.addfile(tarinfo=tarinfo, fileobj=io.BytesIO(data))
+        tar.close()
+        tarstream.seek(0)
+        return tarstream
+
+    def add_file(self, filename: str, data: str) -> None:
+        tarstream = self._make_archive(filename, data.encode('utf-8'))
+        self.dind.api.put_archive(self.container.id, WORK_DIR, tarstream)
+
+    def status(self) -> dict[Literal["Status", "Running", "Paused", "Restarting",
+                                     "OOMKilled", "Dead", "Pid", "ExitCode", "Error", "StartedAt", "FinishedAt"]]:
+        self.container.reload()
+        return self.container.attrs['State']
+
+    def __del__(self):
+        self.container.remove(force=True)
+        self.stdin.close()
 
 
-def callback(ch, method, properties, body):
-    """
-    body attribute is JSON object with schema shown below
-    {
-        "langauage": <programming language: str>,
-        "code": <user code: str>,
-        "input": [<stdin stream: str>]
-        "test_cases": [expected output: str]
-    }
-    """
-    print(" [x] Received %r" % body.decode())
-    data = json.loads(body.decode())
-    # Save the code, input to a file
-    save_code(data["code"], data["language"])
-    # handle multiple input file
-    submission = {
-        "stdout": [],
-        "stderr": [],
-        "test_cases": data["test_cases"]
-    }
-    for code_input in data["input"]:
-        save_input(code_input)
-        # Execute the code
-        execute(data["language"])
-        submission["stderr"].append(
-            read_file("stderr.txt"))
-        submission["stdout"].append(
-            read_file("stdout.txt"))
-        # Clean Up stderr and stdout file
-        cleanup_stdout()
-        cleanup_stderr()
-    submission["status"] = "done execution"
-    # Save the result to submission database
-    execute_command(redis_master.set,
-                    data["submission_id"], json.dumps(submission), 600)
-    # Send the output to judge
-    judge(data["submission_id"])
-    # Clean up
-    clean_up(data["language"])
-    cleanup_executable()
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+class Worker():
+    def __init__(self, envrionment ,**languages):
+        self.languages = languages
+        self.redis = self.__init_redis(envrionment)
+        self.queue = self.__init_rabbitmq(envrionment)
+        self.dind = self.__dind()
+        self.workdir = os.getenv("WORK_DIR").strip()
+        self.__load_interpreter(self.dind, self.languages)
 
+    def run(self, queue_name: str):
+        self.queue.basic_qos(prefetch_count=1)
+        self.queue.queue_declare(queue=queue_name.strip(), durable=True)
+        print(' [*] Waiting for messages. To exit press CTRL+C')
+        self.queue.basic_consume(queue=queue_name, on_message_callback=self.__callback)
+        self.queue.start_consuming()
 
-def judge(submission_id: int):
-    result = requests.post(
-        "http://judge.judge.svc.cluster.local/judge", json={"submission_id": submission_id})
-    return result.status_code
+    def save_code(self, code: str, language: str):
+        """
+        Save the code to a file
 
-
-def cleanup_stdout():
-    if os.path.exists("stdout.txt"):
-        os.remove("stdout.txt")
-
-
-def cleanup_stderr():
-    if os.path.exists("stderr.txt"):
-        os.remove("stderr.txt")
-
-
-def cleanup_executable():
-    if os.path.exists("code"):
-        os.remove("code")
-
-
-def clean_up(langauge):
-    cleanup_stdout()
-    cleanup_stdout()
-    os.remove("input.txt")
-    if (langauge == "c"):
-        os.remove("code.c")
-    elif (langauge == "cpp"):
-        os.remove("code.cpp")
-    elif (langauge == "rust"):
-        os.remove("code.rs")
-    else:
-        print("Language not supported")
-
-
-def save_code(code, language):
-    if (language == "cpp"):
-        with open("code.cpp", "w") as f:
-            f.write(code)
-    elif (language == "c"):
-        with open("code.c", "w") as f:
-            f.write(code)
-    elif (language == "rust"):
-        with open("code.rs", "w") as f:
-            f.write(code)
-    else:
-        print("Language not supported")
-
-
-def save_stderr(stderr):
-    with open("stderr.txt", "w") as f:
-        f.write(stderr)
-
-
-def save_stdout(stdout):
-    with open("stdout.txt", "w") as f:
-        f.write(stdout)
-
-
-def save_input(input):
-    with open("input.txt", "w") as f:
-        f.write(input)
-
-
-def read_file(filename):
-    with open(filename, "r") as f:
-        return f.read()
-
-
-def compile_code(language):
-    if (language == "cpp"):
-        compiler = "g++"
-        extension = ".cpp"
-    elif (language == "c"):
-        compiler = "gcc"
-        extension = ".c"
-    elif (language == "rust"):
-        compiler = "rustc"
-        extension = ".rs"
-    subprocess.run([compiler, f"code{extension}", "-o", "code"],
-                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                   timeout=2, check=True, text=True)
-
-
-def run_executable():
-    return subprocess.run(
-        ['./code'], stderr=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        check=True, timeout=2, text=True,
-        input=read_file("input.txt"))
-
-
-def execute(language):
-    """
-    params: language: [c, cpps, rust]
-    If return non-zero mean something wrong
-    """
-    # Compile
-    try:
-        compile_code(language)
-    except subprocess.CalledProcessError as e:
-        save_stderr(e.stderr)
-        save_stdout("")
-    except subprocess.TimeoutExpired:
-        save_stderr("Compile Time Exceeded")
-        save_stdout("")
-    else:
-        # Execute executable
-        try:
-            result = run_executable()
-        except subprocess.CalledProcessError as e:
-            save_stderr(e.stderr)
-            save_stdout("")
-        except subprocess.TimeoutExpired:
-            save_stderr("Run Time Exceeded")
-            save_stdout("")
+        Args:
+            code:
+                The code to be saved
+            language:
+                The language of the code
+        Returns:
+            None
+        Raises:
+            None
+        """
+        if (language == "cpp"):
+            with open("code/code.cpp", "w") as f:
+                f.write(code)
+        elif (language == "c"):
+            with open("code/code.c", "w") as f:
+                f.write(code)
+        elif (language == "rust"):
+            with open("code/code.rs", "w") as f:
+                f.write(code)
         else:
-            save_stderr("")
-            save_stdout(result.stdout)
+            raise Exception("Language not supported")
+
+    def read_file(self, filename):
+        with open(filename, "r") as f:
+            return f.read()
+
+    def compile(self, language: str):
+        if (language == "cpp"):
+            cmd = "c++ --static code.cpp -o code"
+        elif (language == "c"):
+            cmd = "gcc --static code.c -o code"
+        elif (language == "rust"):
+            cmd = "rustc -C target-feature=+crt-static code.rs -o code"
+        else:
+            raise Exception("Language not supported")
+        try:
+            sandbox = Sandbox(self.languages[language], self.dind, command="sleep 3600", timeout=5)
+            sandbox.execute_cmd(cmd)
+            del sandbox
+        except Exception as e:
+            raise Exception(e)
 
 
-queue_channel.basic_qos(prefetch_count=1)
-queue_channel.queue_declare(queue=os.getenv(
-    "CEE_COMPILER_QUEUE_NAME").strip(), durable=True)
-print(' [*] Waiting for messages. To exit press CTRL+C')
-queue_channel.basic_consume(queue=os.getenv("CEE_COMPILER_QUEUE_NAME").strip(),
-                            on_message_callback=callback)
-queue_channel.start_consuming()
+    def run_executable(self) -> Sandbox:
+        sandbox = Sandbox("alpine:latest", self.dind, command="./code", timeout=5)
+        return sandbox
+
+
+    def __execute(self, language) -> tuple[str, str]:
+        try:
+            self.compile(language)
+        except Exception as e:
+            # Compile error
+            return "", e.__str__()
+        else:
+            sandbox = self.run_executable()
+            # Pass input to stdin
+            data = self.read_file(f'{WORK_DIR}/code/input.txt')
+            try:
+                if data is not None:
+                    sandbox.write(data + "\n")
+            except Exception as e:
+                return "", e.__str__()
+            stdout, stderr = sandbox.output()
+            del sandbox
+            return stdout.decode(), stderr.decode()
+
+    def __save_input(self, input: str):
+        """
+        Save the input to a file
+
+        Args:
+            input:
+                The input to be saved
+        Returns:
+            None
+        Raises:
+            None
+        """
+        with open("code/input.txt", "w") as f:
+            f.write(input)
+
+    def __clean_up(self, langauge):
+        os.remove("code/input.txt")
+        os.remove("code/code")
+        if (langauge == "cpp"):
+            os.remove("code/code.cpp")
+        elif (langauge == "c"):
+            os.remove("code/code.c")
+        elif (langauge == "rust"):
+            os.remove("code/code.rs")
+        else:
+            raise Exception("Language not supported")
+
+    def __callback(self, ch, method, properties, body):
+        """
+        Execute after receiving a message from the queue
+
+        Args:
+            body:
+                The message body. It is a JSON string that contains the following fields:
+                    - code: The code to be executed
+                    - language: The language of the code
+                    - input: The input to the code
+                    - test_cases: The test cases to be executed
+                    - submission_id: The id of the submission
+        Returns:
+            None
+        Raises:
+            None
+        """
+        data = json.loads(body.decode())
+        # Save the code, input to a file
+        self.save_code(data["code"], data["language"])
+        # handle multiple input file
+        submission = {
+            "stdout": [],
+            "stderr": [],
+            "test_cases": data["test_cases"]
+        }
+        for code_input in data["input"]:
+            self.__save_input(code_input)
+            stdout, stderr = self.__execute(data["language"])
+            submission["stderr"].append(stderr)
+            submission["stdout"].append(stdout)
+        submission["status"] = "done execution"
+        # Send the output to judge
+        self.__judge(data["submission_id"])
+        # Save the result to submission database
+        self.redis_command(self.redis.set,
+                        data["submission_id"], json.dumps(submission), 600)
+        # Clean up
+        self.__clean_up(data["language"])
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    def __judge(self, submission_id: str) -> int:
+        result = requests.post(
+            "http://judge.judge.svc.cluster.local/judge", json={"submission_id": submission_id})
+        return result.status_code
+
+    def __init_redis(self, environment):
+        if (environment == "development"):
+            redis_sentinels = os.getenv("REDIS_SENTINELS").strip()
+            redis_master_name = os.getenv('REDIS_MASTER_NAME').strip()
+            redis_password = os.getenv('REDIS_PASSWORD').strip()
+            redis_sentinel = Sentinel([(redis_sentinels, 5000)], socket_timeout=5)
+            redis_master = redis_sentinel.master_for(
+                redis_master_name, password=redis_password, socket_timeout=5)
+            return redis_master
+        elif (environment == "production"):
+            redis_master = redis.Redis(
+                host=os.getenv("REDIS_HOST").strip(), port=6379)
+            return redis_master
+
+    def __dind(self) -> docker.DockerClient:
+        max_retries = 4
+        count = 0
+        backoffSeconds = 2
+        while True:
+            try:
+                dind = docker.from_env()
+                return dind
+            except Exception as e:
+                count += 1
+                if count > max_retries:
+                    raise
+            time.sleep(backoffSeconds)
+
+    def redis_command(self, command, *args):
+        max_retries = 2
+        count = 0
+        backoffSeconds = 2
+        while True:
+            try:
+                return command(*args)
+            except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
+                count += 1
+                if count > max_retries:
+                    raise
+            print('Retrying in {} seconds'.format(backoffSeconds))
+            time.sleep(backoffSeconds)
+
+    def __init_rabbitmq(self, environment):
+        if (environment == "development"):
+            submission_queue = os.getenv("SUBMISSION_QUEUE").strip()
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=submission_queue))
+            channel = connection.channel()
+            return channel
+        elif (environment == "production"):
+            rabbitmq_url = self.__inject_username_password_to_rabbitmq_url(
+                os.getenv("SUBMISSION_QUEUE").strip())
+            parameters = pika.URLParameters(rabbitmq_url)
+            connection = pika.BlockingConnection(parameters)
+            channel = connection.channel()
+            return channel
+
+    def __inject_username_password_to_rabbitmq_url(rabbitmq_url, rabbitmq_username, rabbitmq_password):
+        username = rabbitmq_username.strip()
+        password = rabbitmq_password.strip()
+        rabbitmq_url = rabbitmq_url.replace(
+            "amqps://", "amqps://{}:{}@".format(username, password))
+        return rabbitmq_url
+
+    def __load_interpreter(self, dind: docker.DockerClient, languages: dict[str, str]):
+        images = [image.tags[0] for image in dind.images.list()] if dind.images.list() else []
+        try:
+            for language in languages:
+                if languages[language] not in images:
+                    dind.images.pull(languages[language])
+        except Exception as e:
+            raise e
+        return
+
+
+if __name__ == "__main__":
+    WORK_DIR = os.getenv("WORK_DIR")
+    C_CEE_COMPILER_IMAGE = os.getenv(
+        "C_CEE_COMPILER_IMAGE") or "frolvlad/alpine-gxx"
+    CPP_CEE_COMPILER_IMAGE = os.getenv(
+        "CPP_CEE_COMPILER_IMAGE") or "frolvlad/alpine-gxx"
+    RUST_CEE_COMPILER_IMAGE = os.getenv(
+        "RUST_CEE_COMPILER_IMAGE") or "frolvlad/alpine-rust"
+    ALPINE = "alpine:latest"
+    worker = Worker(
+        envrionment=os.getenv("ENVIRONMENT"),
+        cpp=CPP_CEE_COMPILER_IMAGE,
+        c=C_CEE_COMPILER_IMAGE,
+        rust=RUST_CEE_COMPILER_IMAGE,
+        alpine=ALPINE)
+    worker.run(os.getenv("CEE_COMPILER_QUEUE_NAME").strip())
