@@ -123,13 +123,15 @@ def make_submission():
                     json.dumps(submission), 600)
     # Add submission to queue
     if (language is None):
-        abort(400)
-    if (language in ["python", "javascript"]):
+        return jsonify({"error": "language is required"}), 400
+    if (language in ["python", "nodejs"]):
         cee_intrepreter_submission(
             language, code, input, test_cases, submission_id)
     elif (language in ["c", "cpp", "rust"]):
         cee_compiler_submission(
             language, code, input, test_cases, submission_id)
+    else:
+        return jsonify({"error": "language not supported"}), 400
     return submission_id
 
 
