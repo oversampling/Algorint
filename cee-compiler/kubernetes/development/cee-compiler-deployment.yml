@@ -16,21 +16,47 @@ spec:
         app: cee-compiler
     spec:
       containers:
+        - name: dind
+          image: docker:dind
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              memory: "400Mi"
+              cpu: 0.7
+            requests:
+              memory: "400Mi"
+              cpu: 0.7
+          volumeMounts:
+            - name: dockersock
+              mountPath: /var/run/
+            - name: code
+              mountPath: /app/code
         - name: cee-compiler
           image: chan1992241/cee-compiler:latest
           imagePullPolicy: Always
           resources:
             limits:
-              memory: "128Mi"
-              cpu: 500m
+              memory: "100Mi"
+              cpu: 0.1
             requests:
-              memory: "128Mi"
-              cpu: 500m
+              memory: "100Mi"
+              cpu: 0.1
           envFrom:
             - configMapRef:
                 name: cee-compiler-configmap
             - secretRef:
                 name: cee-compiler-secrets
+          volumeMounts:
+            - name: dockersock
+              mountPath: /var/run/
+            - name: code
+              mountPath: /app/code
+      volumes:
+        - name: dockersock
+          emptyDir: {}
+        - name: code
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: ConfigMap
