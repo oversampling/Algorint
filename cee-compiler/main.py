@@ -13,12 +13,19 @@ import redis
 import requests
 import docker
 
+class ApplicationError(Exception):
+    def __init__(self, process: Literal["Compile Time", "Run Time"], msg) -> None:
+        self.process = process
+        self.msg = f"{self.process} Error:\n\t{msg}"
+        super().__init__(msg)
 
 class Sandbox:
     def __init__(self, image: str, dind:docker.DockerClient, command: str, timeout:float ,workdir = "/app", cpu_period: int = 1000000, mem_limit: str = "100m", pids_limit: int = 500):
         self.image = image
         self.dind = dind
         self.timeout = timeout
+        self.mem_limit = mem_limit
+        self.cpu_period = cpu_period
         self.container = self.dind.containers.create(
             self.image,
             command,
@@ -37,19 +44,18 @@ class Sandbox:
 
     def write(self, data: str):
         self.stdin.write(data.encode("utf-8"))
-        self.__wait(timeout=self.timeout)
 
     def execute_cmd(self, cmd: str):
         self.container.exec_run(cmd=cmd)
 
-    def __wait(self, timeout: int = 2):
+    def wait(self, timeout: int = 2):
         try:
             self.container.wait(timeout=timeout)
         except Exception:
             raise
 
     def output(self):
-        return self.container.logs(stdout=True, stderr=False), self.container.logs(stdout=False, stderr=True)
+        return self.container.logs(stdout=True, stderr=False).decode(), self.container.logs(stdout=False, stderr=True).decode()
 
     @staticmethod
     def _make_archive(filename: str, data: bytes):
@@ -123,6 +129,25 @@ class Worker():
         with open(filename, "r") as f:
             return f.read()
 
+    def identify_error(self, sandbox: Sandbox, process: Literal["Compile Time", "Run Time"]):
+        try:
+            sandbox.wait(timeout=sandbox.timeout)
+            status = sandbox.status()
+        except requests.exceptions.ConnectionError as e:
+            raise ApplicationError(process, f"{process} Limit Exceeded\n\t{process} Limit = {sandbox.timeout}s")
+        except Exception:
+            raise
+        else:
+            if (status["ExitCode"] != 0):
+                if (status["OOMKilled"] == True):
+                    raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
+                else:
+                    time.sleep(1) # Wait for the output to be written to the container
+                    raise ApplicationError(process, sandbox.output()[1])
+            else:
+                return None
+
+
     def compile(self, language: str):
         if (language == "cpp"):
             cmd = "c++ --static code.cpp -o code"
@@ -133,36 +158,41 @@ class Worker():
         else:
             raise Exception("Language not supported")
         try:
-            sandbox = Sandbox(self.languages[language], self.dind, command="sleep 3600", timeout=5)
-            sandbox.execute_cmd(cmd)
+            sandbox = Sandbox(self.languages[language], self.dind, command=cmd, timeout=5)
+            self.identify_error(sandbox, "Compile Time")
             del sandbox
+        except ApplicationError as e:
+            raise e
         except Exception as e:
             raise Exception(e)
 
 
     def run_executable(self) -> Sandbox:
         sandbox = Sandbox("alpine:latest", self.dind, command="./code", timeout=5)
-        return sandbox
+        # Pass input to stdin
+        data = self.read_file(f'{WORK_DIR}/code/input.txt')
+        try:
+            if data is not None:
+                sandbox.write(data + "\n")
+            self.identify_error(sandbox, "Run Time")
+        except ApplicationError as e:
+            return "", str(e)
+        stdout, stderr = sandbox.output()
+        del sandbox
+        return stdout, stderr
 
 
     def __execute(self, language) -> tuple[str, str]:
         try:
             self.compile(language)
+        except ApplicationError as e:
+            return "", str(e)
         except Exception as e:
             # Compile error
             return "", e.__str__()
         else:
-            sandbox = self.run_executable()
-            # Pass input to stdin
-            data = self.read_file(f'{WORK_DIR}/code/input.txt')
-            try:
-                if data is not None:
-                    sandbox.write(data + "\n")
-            except Exception as e:
-                return "", e.__str__()
-            stdout, stderr = sandbox.output()
-            del sandbox
-            return stdout.decode(), stderr.decode()
+            stdout, stderr = self.run_executable()
+            return stdout, stderr
 
     def __save_input(self, input: str):
         """
@@ -181,7 +211,8 @@ class Worker():
 
     def __clean_up(self, langauge):
         os.remove("code/input.txt")
-        os.remove("code/code")
+        if (os.path.exists("code/code")):
+            os.remove("code/code")
         if (langauge == "cpp"):
             os.remove("code/code.cpp")
         elif (langauge == "c"):
