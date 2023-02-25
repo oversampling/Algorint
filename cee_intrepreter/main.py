@@ -13,11 +13,20 @@ import redis
 import requests
 import docker
 
+class ApplicationError(Exception):
+    def __init__(self, process: Literal["Compile Time", "Run Time"], msg) -> None:
+        self.process = process
+        self.msg = f"{self.process} Error:\n\t{msg}"
+        super().__init__(msg)
 
 class Sandbox:
-    def __init__(self, image: str, dind:docker.DockerClient, command: str, workdir = "/app", cpu_period: int = 1000000, mem_limit: str = "100m", pids_limit: int = 500):
+    def __init__(self, image: str, dind:docker.DockerClient, command: str, timeout: float,workdir = "/app", cpu_period: int = 1000000, mem_limit: str = "100m", pids_limit: int = 500):
         self.image = image
         self.dind = dind
+        self.timeout = timeout
+        self.mem_limit = mem_limit
+        self.cpu_period = cpu_period
+        self.pids_limit = pids_limit
         self.container = self.dind.containers.create(
             self.image,
             command,
@@ -36,16 +45,15 @@ class Sandbox:
 
     def write(self, data: str):
         self.stdin.write(data.encode("utf-8"))
-        self.__wait(timeout=2)
 
-    def __wait(self, timeout: int = 2):
+    def wait(self, timeout: int = 2):
         try:
             self.container.wait(timeout=timeout)
         except Exception:
             raise
 
     def output(self):
-        return self.container.logs(stdout=True, stderr=False), self.container.logs(stdout=False, stderr=True)
+        return self.container.logs(stdout=True, stderr=False).decode(), self.container.logs(stdout=False, stderr=True).decode()
 
     @staticmethod
     def _make_archive(filename: str, data: bytes):
@@ -110,30 +118,49 @@ class Worker():
             with open("code/code.js", "w") as f:
                 f.write(code)
         else:
-            print("Language not supported")
+            raise Exception("Language not supported")
 
     def read_file(self, filename):
         with open(filename, "r") as f:
             return f.read()
 
-    def __execute(self, language) -> tuple[str, str]:
-        if (language == "python"):
-            sandbox = Sandbox(self.languages[language], self.dind, command="python code.py")
-        elif (language == "nodejs"):
-            sandbox = Sandbox(self.languages[language], self.dind, command="node code.js")
+    def identify_error(self, sandbox: Sandbox, process: Literal["Compile Time", "Run Time"]):
+        try:
+            sandbox.wait(timeout=sandbox.timeout)
+            status = sandbox.status()
+        except requests.exceptions.ConnectionError as e:
+            raise ApplicationError(process, f"{process} Limit Exceeded\n\t{process} Limit = {sandbox.timeout}s")
+        except Exception:
+            raise
         else:
-            return "", "Language not supported"
-        # Pass input to stdin
-        data = self.read_file(f'{WORK_DIR}/code/input.txt')
+            if (status["ExitCode"] != 0):
+                if (status["OOMKilled"] == True):
+                    raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
+                else:
+                    time.sleep(1) # Wait for the output to be written to the container
+                    raise ApplicationError(process, sandbox.output()[1])
+            else:
+                return None
+
+    def __execute(self, language: Literal["python", "nodejs"]) -> tuple[str, str]:
+        if (language == "python"):
+            sandbox = Sandbox(self.languages[language], self.dind, command="python code.py", timeout=2)
+        elif (language == "nodejs"):
+            sandbox = Sandbox(self.languages[language], self.dind, command="node code.js", timeout=2)
+        else:
+            raise Exception("Language not supported")
+        data = self.read_file(f'{self.workdir}/code/input.txt')
         try:
             if data is not None:
                 sandbox.write(data + "\n")
+            self.identify_error(sandbox, "Run Time")
+        except ApplicationError as e:
+            return "", str(e)
         except Exception as e:
-            print(sandbox.status())
-            return "", e.__str__()
+            return "", str(e)
         stdout, stderr = sandbox.output()
         del sandbox
-        return stdout.decode(), stderr.decode()
+        return stdout, stderr
 
     def __save_input(self, input: str):
         """
@@ -151,7 +178,8 @@ class Worker():
             f.write(input)
 
     def __clean_up(self, langauge):
-        os.remove("code/input.txt")
+        if (os.path.exists("code/input.txt")):
+            os.remove("code/input.txt")
         if (langauge == "nodejs"):
             os.remove("code/code.js")
         elif (langauge == "python"):
@@ -300,6 +328,4 @@ if __name__ == "__main__":
         envrionment=os.getenv("ENVIRONMENT"),
         python=PYTHON_CEE_INTERPRETER_IMAGE,
         nodejs=NODEJS_CEE_INTERPRETER_IMAGE)
-    print("initialize 1")
     worker.run(os.getenv("CEE_INTERPRETER_QUEUE_NAME").strip())
-    print("initialize 2")
