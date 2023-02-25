@@ -243,7 +243,7 @@ class Worker():
         # Save the code, input to a file
         self.save_code(data["code"], data["language"])
         # handle multiple input file
-        submission = {
+        submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result"]] = {
             "stdout": [],
             "stderr": [],
             "test_cases": data["test_cases"]
@@ -254,10 +254,13 @@ class Worker():
             submission["stderr"].append(stderr)
             submission["stdout"].append(stdout)
         submission["status"] = "done execution"
-        # Send the output to judge
-        self.__judge(data["submission_id"])
         # Save the result to submission database
         self.redis_command(self.redis.set,
+                        data["submission_id"], json.dumps(submission), 600)
+        # Send the output to judge
+        if (self.__judge(data["submission_id"]) != 200):
+            submission["result"] = "Judge Error"
+            self.redis_command(self.redis.set,
                         data["submission_id"], json.dumps(submission), 600)
         # Clean up
         self.__clean_up(data["language"])
