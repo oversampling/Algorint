@@ -60,11 +60,15 @@ def make_judge():
     submission = execute_command(redis_master.get, submission_id)
     submission = json.loads(submission)
     stdouts = submission["stdout"]
+    stderr = submission["stderr"]
     test_cases = submission["test_cases"]
     # Get result of each judgement based on stdout and test case
     results = []
     for index, stdout in enumerate(stdouts):
-        result = judge(stdout, test_cases[index])
+        if (stderr[index] == ""):
+            result = judge(stdout, test_cases[index])
+        else:
+            result = False
         results.append(result)
     # Update submission database
     submission["result"] = results
