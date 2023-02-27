@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from flask import abort, jsonify, request
 from redis.sentinel import Sentinel
 import time
+from flask_cors import CORS
 import redis
 import uuid
 
@@ -80,6 +81,7 @@ def execute_command(command, *args):
 
 load_dotenv()
 app = Flask(__name__)
+cors = CORS(app)
 redis_master = initialize_submission_database()
 
 
