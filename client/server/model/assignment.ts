@@ -1,9 +1,20 @@
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
-const Schema = mongoose.Schema;
+export interface IAssignment {
+    question: string,
+    language: string,
+    codeTemplate: string,
+    testCases: [
+        Schema.Types.ObjectId,
+    ]
+}
 
 const AssignmentSchema = new Schema({
-    question: String,
+    question: {
+        type: String,
+        required: true,
+        maxLength: 50
+    },
     language: String,
     codeTemplate: String,
     testCases: [{
@@ -12,4 +23,5 @@ const AssignmentSchema = new Schema({
     }]
 });
 
-module.exports = mongoose.model("Assignment", AssignmentSchema);
+const Assignment = mongoose.model("Assignment", AssignmentSchema);
+export default Assignment;

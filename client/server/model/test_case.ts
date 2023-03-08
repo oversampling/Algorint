@@ -2,7 +2,16 @@ import mongoose from "mongoose";
 
 const Schema = mongoose.Schema;
 
-const TestCaseSchema = new Schema({
+export interface ITestCase {
+    stdin: string,
+    stdout: string,
+    inject: {
+        from: string,
+        to: string,
+    }
+}
+
+const TestCaseSchema = new Schema<ITestCase>({
     stdin: String,
     stdout: String,
     inject: {
@@ -11,4 +20,5 @@ const TestCaseSchema = new Schema({
     }
 });
 
-module.exports = mongoose.model("TestCase", TestCaseSchema);
+const TestCase = mongoose.model<ITestCase>("TestCase", TestCaseSchema);
+export default TestCase;

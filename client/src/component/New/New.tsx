@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     Button,
     Card,
@@ -8,6 +8,7 @@ import {
     Row,
     Stack,
 } from "react-bootstrap";
+import useFetch from "../../hooks/useFetch";
 import Code from "../Editor/Code";
 import Markdown from "../Editor/Markdown";
 import Header from "../Header";
@@ -33,7 +34,7 @@ interface Assignment {
 interface Post {
     title: string;
     description: string;
-    isPrivate: boolean;
+    isPublic: boolean;
     assignments: Assignment[];
 }
 
@@ -42,12 +43,12 @@ export default function New() {
     const [assingmentList, setAssignmentList] = useState<Assignment[]>([]);
     function handlePostChange(e: React.ChangeEvent<HTMLInputElement>) {
         const { name, value } = e.target;
-        if (name === "isPrivate") {
-            const label = document.querySelector("label[for='isPrivate']");
+        if (name === "isPublic") {
+            const label = document.querySelector("label[for='isPublic']");
             if (label !== null) {
                 e.target.checked
-                    ? (label.innerHTML = "Private")
-                    : (label.innerHTML = "Public");
+                    ? (label.innerHTML = "Public")
+                    : (label.innerHTML = "Private");
             }
             setPost({ ...post, [name]: e.target.checked });
         } else {
@@ -132,20 +133,51 @@ export default function New() {
         setAssignmentList(list);
         setPost({ ...post, assignments: list });
     }
+    async function savePost(e: React.FormEvent<HTMLFormElement>) {
+        const url = "http://localhost:3000";
+        e.preventDefault();
+        if (post.title === undefined) {
+            alert("Title is required");
+            return;
+        }
+        if (post.isPublic === undefined) {
+            post["isPublic"] = false;
+        }
+        if (post.description === undefined) {
+            alert("Description is required");
+            return;
+        }
+        if (post.assignments === undefined) {
+            post["assignments"] = [];
+        }
+        async function fetchData(): Promise<any> {
+            const res = await fetch(`${url}/api/post/new`, {
+                method: "POST",
+                body: JSON.stringify(post),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+            const json = await res.json();
+            return json;
+        }
+        const data = await fetchData();
+        console.log(data);
+    }
     return (
         <div>
             <Header />
-            <div>
-                <Form>
-                    <Card style={{ margin: 15 }}>
+            <div style={{ marginLeft: 15, marginRight: 15 }}>
+                <Form onSubmit={savePost}>
+                    <Card style={{ marginTop: 15, marginBottom: 15 }}>
                         <Card.Header>
                             <Stack direction="horizontal" gap={3}>
                                 <div>New Post</div>
                                 <Form.Check
                                     className="ms-auto"
                                     type="switch"
-                                    id="isPrivate"
-                                    name="isPrivate"
+                                    id="isPublic"
+                                    name="isPublic"
                                     label={`Private`}
                                     onChange={handlePostChange}
                                 />
@@ -387,6 +419,15 @@ export default function New() {
                             </Button>
                         </Card.Body>
                     </Card>
+                    <Stack direction="horizontal">
+                        <Button
+                            variant="primary"
+                            type="submit"
+                            className="ms-auto"
+                        >
+                            Save Post
+                        </Button>
+                    </Stack>
                 </Form>
             </div>
             <div>{JSON.stringify(post)}</div>
