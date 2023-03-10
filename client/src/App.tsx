@@ -5,8 +5,6 @@ import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
 import cssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
 import htmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
 import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
-import "bootstrap/dist/css/bootstrap.min.css";
-import New from "./component/New/New";
 
 self.MonacoEnvironment = {
     getWorker(_, label) {
@@ -30,7 +28,7 @@ loader.config({ monaco });
 function App() {
     return (
         <>
-            <New />
+            <h1>Main Page</h1>
         </>
     );
 }
