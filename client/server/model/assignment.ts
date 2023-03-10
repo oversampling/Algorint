@@ -3,8 +3,8 @@ import mongoose, { Schema } from "mongoose";
 export interface IAssignment {
     question: string,
     language: string,
-    codeTemplate: string,
-    testCases: [
+    code_template: string,
+    test_cases: [
         Schema.Types.ObjectId,
     ]
 }
@@ -16,8 +16,8 @@ const AssignmentSchema = new Schema({
         maxLength: 50
     },
     language: String,
-    codeTemplate: String,
-    testCases: [{
+    code_template: String,
+    test_cases: [{
         type: Schema.Types.ObjectId,
         ref: "TestCase"
     }]

@@ -22,9 +22,38 @@ app.get("/", (req: Request, res: Response) => {
     res.json({message: "Hello World"})
 })
 
-app.post("/api/post/new", async (req: Request, res: Response, next: NextFunction) => {
+app.get("/api/posts", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const posts = await Post.find({isPublic: true}).populate("assignments").populate({
+            path: "assignments",
+            populate: {
+                path: "testCases"
+            }
+        });;
+        res.status(200).json(posts)
+    } catch (error) {
+        next(error)
+    }
+})
+
+app.get("/api/posts/:id", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const post = await Post.findById(req.params.id).populate({
+            path: "assignments",
+            populate: {
+                path: "test_cases"
+            }
+        });
+        res.status(200).json(post)
+    }catch (error) {
+        res.status(404).json({message: "Post not found"})
+    }
+})
+
+app.post("/api/posts/new", async (req: Request, res: Response, next: NextFunction) => {
     try {
         const body: INewPost = req.body;
+        console.log(JSON.stringify(body));
         const post = new Post({
             title: body.title,
             description: body.description,
@@ -34,18 +63,20 @@ app.post("/api/post/new", async (req: Request, res: Response, next: NextFunction
         for (const assignment of body.assignments) {
             const newAssignment = new Assignment({
                 question: assignment.question,
-                language: assignment.language,
-                codeTemplate: assignment.codeTemplate,
+                language: assignment.language || "python",
+                code_template: assignment.code_template,
             });
             await newAssignment.save();
-            for (const testCase of assignment.testCases) {
-                const newTestCase = new TestCase({
-                    stdin: testCase.stdin,
-                    stdout: testCase.stdout,
-                    inject: testCase.inject,
-                });
-                await newTestCase.save();
-                newAssignment.testCases.push(newTestCase._id);
+            if (assignment.test_cases){
+                for (const test_case of assignment.test_cases) {
+                    const newTestCase = new TestCase({
+                        stdin: test_case.stdin,
+                        stdout: test_case.stdout,
+                        inject: test_case.inject,
+                    });
+                    await newTestCase.save();
+                    newAssignment.test_cases.push(newTestCase._id);
+                }
             }
             await newAssignment.save();
             post.assignments.push(newAssignment._id);
@@ -65,6 +96,7 @@ app.all("*", (req: Request, res:Response, next: NextFunction) => {
 app.use((err: ExpressError, req: Request, res: Response, next: NextFunction) => {
     const { status = 404 } = err
     if (!err.message) err.message = "!Oh No something went wrong"
+    console.log(err)
     res.status(status).send( err )
 })
 

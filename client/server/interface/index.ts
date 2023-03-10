@@ -6,8 +6,8 @@ export interface INewPost {
         {
             question: string,
             language: string,
-            codeTemplate: string,
-            testCases: [
+            code_template: string,
+            test_cases: [
                 {
                     stdin: string,
                     stdout: string,
