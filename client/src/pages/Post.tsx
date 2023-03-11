@@ -5,7 +5,9 @@ import Code from "../component/Editor/Code";
 import Markdown from "../component/Editor/Markdown";
 import Header from "../component/Header";
 import useFetch from "../hooks/useFetch";
+import MarkdownEditor from "@uiw/react-markdown-editor";
 import { Post } from "../interface";
+import MarkdownPreview from "../component/MarkdownPreview";
 
 export default function Posts() {
     const url = "http://localhost:3000";
@@ -59,11 +61,11 @@ export default function Posts() {
                                 </Stack>
                             </Card.Header>
                             <Card.Body>
-                                <Markdown value={`${data["description"]}`} />
+                                <MarkdownPreview value={data["description"]} />
                             </Card.Body>
                             {data["assignments"].map((assignment, index) => (
-                                <Form>
-                                    <Card style={{ margin: 15 }} key={index}>
+                                <Form key={index}>
+                                    <Card style={{ margin: 15 }}>
                                         <Card.Header>
                                             Assignment {index + 1}
                                         </Card.Header>
@@ -72,7 +74,7 @@ export default function Posts() {
                                                 <Form.Label>
                                                     Assignment Question
                                                 </Form.Label>
-                                                <Markdown
+                                                <MarkdownPreview
                                                     value={
                                                         assignment["question"]
                                                     }

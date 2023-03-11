@@ -5,7 +5,6 @@ import Form from "react-bootstrap/Form";
 import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
 import { useNavigate } from "react-router-dom";
-import useFetch from "../hooks/useFetch";
 
 export default function Header() {
     const url = "http://localhost:3000";
@@ -15,6 +14,7 @@ export default function Header() {
         let target = e.target as HTMLFormElement;
         navigate(`/posts/search?search=${target["search"].value || ""}`);
     };
+    document.documentElement.setAttribute("data-color-mode", "light");
     return (
         <Navbar bg="light" expand="lg">
             <Container fluid>

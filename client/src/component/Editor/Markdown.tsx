@@ -10,7 +10,6 @@ interface MarkdownProps {
 
 export default function Markdown(props: MarkdownProps) {
     const [markdown, setMarkdown] = useState<string>("");
-    document.documentElement.setAttribute("data-color-mode", "light");
     function onChange(value: string) {
         setMarkdown(value);
         props.onChange && props.onChange(value, props.index);

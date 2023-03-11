@@ -13,7 +13,6 @@ const AssignmentSchema = new Schema({
     question: {
         type: String,
         required: true,
-        maxLength: 50
     },
     language: String,
     code_template: String,
