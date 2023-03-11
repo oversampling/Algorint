@@ -8,6 +8,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import Posts from "./pages/Posts";
 import ErrorPage from "./pages/ErrorPage";
 import Post from "./pages/Post";
+import SearchPosts from "./pages/SearchPosts";
 
 const router = createBrowserRouter([
     {
@@ -25,6 +26,10 @@ const router = createBrowserRouter([
             {
                 path: "new",
                 element: <New />,
+            },
+            {
+                path: "search",
+                element: <SearchPosts />,
             },
         ],
     },

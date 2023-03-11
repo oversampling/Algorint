@@ -11,14 +11,13 @@ export default function Posts() {
     const url = "http://localhost:3000";
     const { id } = useParams<{ id: string }>();
     const [data, loading] = useFetch<Post>(`${url}/api/posts/${id}`, "GET", "");
-    console.log(data);
     return (
         <div>
             <Header />
             <div style={{ margin: 15 }}>
                 <Stack direction="horizontal" gap={3} className="mb-3">
                     <div className="fw-light fs-4">Post</div>
-                    <Link to={"new"} className="btn btn-primary ms-auto">
+                    <Link to={"/posts/new"} className="btn btn-primary ms-auto">
                         New
                     </Link>
                 </Stack>
