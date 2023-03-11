@@ -6,7 +6,7 @@ import Post from './model/post';
 import Assignment from './model/assignment';
 import TestCase from './model/test_case';
 import ExpressError from './utils/ExpressError';
-import { INewPost } from './interface';
+import { INewPost, IRequestQuery_Posts } from './interface';
 
 const app: Express = express();
 mongoose.connect('mongodb://127.0.0.1:27017/algorint')
@@ -22,15 +22,41 @@ app.get("/", (req: Request, res: Response) => {
     res.json({message: "Hello World"})
 })
 
-app.get("/api/posts", async (req: Request, res: Response, next: NextFunction) => {
+app.get("/api/posts", async (req: Request<{}, {}, IRequestQuery_Posts>, res: Response, next: NextFunction) => {
+    const {query} = req;
+    const {page, limit, stars, publishDate, search} = query;
+    const options = {
+        page: Number(page)|| 1,
+        limit: Number(limit) || 10,
+        sort: {
+            stars: stars || "DESC",
+            publishDate: publishDate || "DESC"
+        },
+        search: search || ""
+    }
     try {
-        const posts = await Post.find({isPublic: true}).populate("assignments").populate({
-            path: "assignments",
-            populate: {
-                path: "testCases"
-            }
-        });;
-        res.status(200).json(posts)
+        if (options.page < 1) throw new ExpressError("Page number must be greater than 0", 400)
+        if (options.limit < 1) throw new ExpressError("Limit must be greater than 0", 400)
+        if (options.search && options.search !== ""){
+            const posts = await Post.find({$text: {$search: options.search.toString()}}).populate("assignments").populate({
+                path: "assignments",
+                populate: {
+                    path: "test_cases"
+                }}).sort({stars: options.sort.stars === "ASC" ? 1 : -1})
+                .sort({publishDate: options.sort.publishDate === "ASC" ? 1 : -1})
+                .limit(options.limit).skip((options.page - 1) * options.limit)
+                res.status(200).json(posts)
+        }else{
+            const posts = await Post.find({isPublic: true}).populate("assignments").populate({
+                path: "assignments",
+                populate: {
+                    path: "test_cases"
+                }
+            }).sort({stars: options.sort.stars === "ASC" ? 1 : -1})
+            .sort({publishDate: options.sort.publishDate === "ASC" ? 1 : -1})
+            .limit(options.limit).skip((options.page - 1) * options.limit)
+            res.status(200).json(posts)
+        }
     } catch (error) {
         next(error)
     }

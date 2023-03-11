@@ -20,3 +20,11 @@ export interface INewPost {
         }
     ]
 }
+
+export interface IRequestQuery_Posts{
+    page: number;
+    limit: number;
+    stars?: "ASC" | "DESC";
+    publishDate?: "ASC" | "DESC";
+    search?: string;
+}

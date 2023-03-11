@@ -27,5 +27,6 @@ const PostSchema = new Schema<IPost>({
         {type: Types.ObjectId, ref: "Assignment"}
     ]
 })
+PostSchema.index({'$**': 'text'});
 const Post = mongoose.model<IPost>("Post", PostSchema)
 export default Post
