@@ -1,3 +1,4 @@
+require('dotenv').config()
 import express, {Express, NextFunction, Request, Response} from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -7,22 +8,71 @@ import Assignment from './model/assignment';
 import TestCase from './model/test_case';
 import ExpressError from './utils/ExpressError';
 import { INewPost, IRequestQuery_Posts } from './interface';
+import { OAuth2Client, UserRefreshClient } from 'google-auth-library';
+import cookieParser from 'cookie-parser';
+
+const oAuth2Client = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    'postmessage',
+  );
 
 const app: Express = express();
 mongoose.connect('mongodb://127.0.0.1:27017/algorint')
   .then(() => console.log('Mongodb Connected'));
 
-app.use(cors())
+app.use(cors({origin: "http://localhost:5173", credentials: true}))
 app.use(express.json())
+app.use(cookieParser())
 app.use(express.urlencoded({ extended: true }))
 process.env.ENV === "production" && app.use(express.static(path.join(__dirname, '../../dist')));
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+async function verify(token: string): Promise<Boolean> {
+    try{
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        return true
+    }
+    catch (err){
+        return false
+    }
+}
+
+const isLoggedIn = async function (req: Request, res: Response, next: NextFunction) {
+    console.log(req.cookies)
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({message: "Unauthorized"})
+    const isValid = await verify(token);
+    if (!isValid) return res.status(401).json({message: "Unauthorized"})
+    next();
+}
 
 app.get("/", (req: Request, res: Response) => {
     process.env.ENV === "production" && res.sendFile(path.join(__dirname, './index.html'));
     res.json({message: "Hello World"})
 })
 
-app.get("/api/posts", async (req: Request<{}, {}, IRequestQuery_Posts>, res: Response, next: NextFunction) => {
+app.post('/auth/google', async (req, res) => {
+    const { tokens } = await oAuth2Client.getToken(req.body.code); // exchange code for tokens
+    res.cookie('token', tokens.id_token, { httpOnly: true, secure: true, maxAge: 24 * 60 * 60 * 1000, sameSite: "none" })
+    return res.json(tokens);
+  });
+
+app.post('/auth/google/refresh-token', async (req, res) => {
+    const user = new UserRefreshClient(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        req.body.refreshToken,
+    );
+    const { credentials } = await user.refreshAccessToken(); // optain new tokens
+    res.json(credentials);
+})
+
+app.get("/api/posts", isLoggedIn ,async (req: Request<{}, {}, IRequestQuery_Posts>, res: Response, next: NextFunction) => {
     const {query} = req;
     const {page, limit, stars, publishDate, search} = query;
     const options = {
@@ -62,7 +112,7 @@ app.get("/api/posts", async (req: Request<{}, {}, IRequestQuery_Posts>, res: Res
     }
 })
 
-app.get("/api/posts/:id", async (req: Request, res: Response, next: NextFunction) => {
+app.get("/api/posts/:id", isLoggedIn ,async (req: Request, res: Response, next: NextFunction) => {
     try {
         const post = await Post.findById(req.params.id).populate({
             path: "assignments",
@@ -76,7 +126,7 @@ app.get("/api/posts/:id", async (req: Request, res: Response, next: NextFunction
     }
 })
 
-app.post("/api/posts/new", async (req: Request, res: Response, next: NextFunction) => {
+app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const body: INewPost = req.body;
         console.log(JSON.stringify(body));

@@ -9,11 +9,17 @@ import Posts from "./pages/Posts";
 import ErrorPage from "./pages/ErrorPage";
 import Post from "./pages/Post";
 import SearchPosts from "./pages/SearchPosts";
+import Home from "./pages/Home";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import RequireAuth from "./features/auth/RequireAuth";
+import { Provider } from "react-redux";
+import { store } from "./app/store";
 
 const router = createBrowserRouter([
     {
         path: "/posts",
         errorElement: <ErrorPage />,
+        element: <RequireAuth />,
         children: [
             {
                 path: "",
@@ -35,10 +41,18 @@ const router = createBrowserRouter([
     },
     {
         path: "/",
-        element: <App />,
+        element: <Home />,
+    },
+    {
+        path: "/404",
+        element: <ErrorPage />,
     },
 ]);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-    <RouterProvider router={router} />
+    <Provider store={store}>
+        <GoogleOAuthProvider clientId="912051958375-ja2q860ntc18iu1rvhsdpr8oi2n5qnku.apps.googleusercontent.com">
+            <RouterProvider router={router} />
+        </GoogleOAuthProvider>
+    </Provider>
 );

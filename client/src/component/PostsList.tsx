@@ -6,11 +6,6 @@ import Showdown from "showdown";
 export default function PostList({ posts }: { posts?: Post[] }) {
     const showdown = Showdown,
         converter = new showdown.Converter();
-    posts?.map((post) => {
-        if (post.publishDate) {
-            post.publishDate = new Date(post.publishDate);
-        }
-    });
     return (
         <div>
             {posts && (
@@ -51,10 +46,16 @@ export default function PostList({ posts }: { posts?: Post[] }) {
                                                 <div className="ms-auto">
                                                     {post.publishDate &&
                                                         `${
-                                                            post.publishDate
+                                                            new Date(
+                                                                post.publishDate
+                                                            )
                                                                 .toISOString()
                                                                 .split("T")[0]
-                                                        } ${post.publishDate.getHours()}:${post.publishDate.getMinutes()}`}
+                                                        } ${new Date(
+                                                            post.publishDate
+                                                        ).getHours()}:${new Date(
+                                                            post.publishDate
+                                                        ).getMinutes()}`}
                                                 </div>
                                             </Stack>
                                         </Card.Body>
