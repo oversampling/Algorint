@@ -20,7 +20,7 @@ const baseQueryWithReauth = async (args: string | FetchArgs, api: BaseQueryApi, 
     if (result?.error?.status === 403) {
         console.log('sending refresh token')
         // send refresh token to get new access token
-        const refreshResult = await baseQuery('/refresh', api, extraOptions)
+        const refreshResult = await baseQuery('/auth/google/refresh-token', api, extraOptions)
         console.log(refreshResult)
         if (refreshResult?.data) {
             const user = (api.getState() as RootState).auth.user

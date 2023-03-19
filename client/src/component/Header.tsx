@@ -26,11 +26,13 @@ export default function Header() {
     const googleLogin = useGoogleLogin({
         onSuccess: async ({ code }) => {
             try {
-                const tokens = await login(code).unwrap();
-                let decoded_jwt: IJWT_decode = jwt_decode(tokens.id_token);
+                const { tokens }: { tokens: string } = await login(
+                    code
+                ).unwrap();
+                let decoded_jwt: IJWT_decode = jwt_decode(tokens);
                 dispatch(
                     setCredentials({
-                        token: tokens.id_token,
+                        token: tokens,
                         user: decoded_jwt.name,
                     })
                 );

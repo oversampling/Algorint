@@ -5,16 +5,17 @@ import useFetch from "../hooks/useFetch";
 import { Post } from "../interface";
 import PostList from "../component/PostsList";
 import { useState } from "react";
+import { useSearchPostsQuery } from "../features/posts/postsApiSlice";
 
 export default function SearchPosts() {
-    const url = "http://localhost:3000";
     let [searchParams, setSearchParams] = useSearchParams();
     const search = searchParams.get("search");
-    const [data, loading] = useFetch<Post[]>(
-        `${url}/api/posts?search=${search}`,
-        "GET",
-        {}
-    );
+    const { data, isLoading }: { data?: Post[]; isLoading: boolean } =
+        useSearchPostsQuery({
+            page: 1,
+            limit: 10,
+            search: search || "",
+        });
     return (
         <div>
             <Header />
@@ -29,7 +30,7 @@ export default function SearchPosts() {
                             New
                         </Link>
                     </Stack>
-                    {loading ? (
+                    {isLoading ? (
                         <div
                             className="spinner-border text-primary position-absolute top-50 start-50"
                             role="status"

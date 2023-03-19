@@ -1,18 +1,16 @@
-import { useEffect } from "react";
+import { Key, useEffect } from "react";
 import { Button, Card, FloatingLabel, Form, Stack } from "react-bootstrap";
 import { json, Link, useParams } from "react-router-dom";
 import Code from "../component/Editor/Code";
-import Markdown from "../component/Editor/Markdown";
 import Header from "../component/Header";
-import useFetch from "../hooks/useFetch";
-import MarkdownEditor from "@uiw/react-markdown-editor";
-import { Post } from "../interface";
 import MarkdownPreview from "../component/MarkdownPreview";
+import { useViewPostQuery } from "../features/posts/postsApiSlice";
+import { Post } from "../interface";
 
 export default function Posts() {
-    const url = "http://localhost:3000";
     const { id } = useParams<{ id: string }>();
-    const [data, loading] = useFetch<Post>(`${url}/api/posts/${id}`, "GET", "");
+    const { data, isLoading }: { data?: Post; isLoading: boolean } =
+        useViewPostQuery(id || "");
     return (
         <div>
             <Header />
@@ -23,7 +21,7 @@ export default function Posts() {
                         New
                     </Link>
                 </Stack>
-                {loading ? (
+                {isLoading ? (
                     <Card
                         style={{ height: "70vh" }}
                         className="position-relative"
@@ -63,97 +61,103 @@ export default function Posts() {
                             <Card.Body>
                                 <MarkdownPreview value={data["description"]} />
                             </Card.Body>
-                            {data["assignments"].map((assignment, index) => (
-                                <Form key={index}>
-                                    <Card style={{ margin: 15 }}>
-                                        <Card.Header>
-                                            Assignment {index + 1}
-                                        </Card.Header>
-                                        <Card.Body>
-                                            <div className="mb-3">
-                                                <Form.Label>
-                                                    Assignment Question
-                                                </Form.Label>
-                                                <MarkdownPreview
-                                                    value={
-                                                        assignment["question"]
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="mb-3">
-                                                <Form.Label>
-                                                    Your Answer
-                                                </Form.Label>
-                                                <Card>
-                                                    <Card.Header>
-                                                        <Form.Select
-                                                            aria-label="Default select example"
-                                                            className="w-25"
-                                                        >
-                                                            <option>
-                                                                {
+                            {data["assignments"].map(
+                                (assignment, index: number) => (
+                                    <Form key={index}>
+                                        <Card style={{ margin: 15 }}>
+                                            <Card.Header>
+                                                Assignment {index + 1}
+                                            </Card.Header>
+                                            <Card.Body>
+                                                <div className="mb-3">
+                                                    <Form.Label>
+                                                        Assignment Question
+                                                    </Form.Label>
+                                                    <MarkdownPreview
+                                                        value={
+                                                            assignment[
+                                                                "question"
+                                                            ]
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="mb-3">
+                                                    <Form.Label>
+                                                        Your Answer
+                                                    </Form.Label>
+                                                    <Card>
+                                                        <Card.Header>
+                                                            <Form.Select
+                                                                aria-label="Default select example"
+                                                                className="w-25"
+                                                            >
+                                                                <option>
+                                                                    {
+                                                                        assignment[
+                                                                            "language"
+                                                                        ]
+                                                                    }
+                                                                </option>
+                                                            </Form.Select>
+                                                        </Card.Header>
+                                                        <Card.Body>
+                                                            <Code
+                                                                language={
                                                                     assignment[
                                                                         "language"
                                                                     ]
                                                                 }
-                                                            </option>
-                                                        </Form.Select>
-                                                    </Card.Header>
-                                                    <Card.Body>
-                                                        <Code
-                                                            language={
-                                                                assignment[
-                                                                    "language"
-                                                                ]
-                                                            }
-                                                            index={index}
-                                                            value={
-                                                                assignment[
-                                                                    "code_template"
-                                                                ]
-                                                            }
-                                                        />
-                                                    </Card.Body>
-                                                </Card>
-                                            </div>
-                                            <FloatingLabel
-                                                controlId="floatingTextarea2"
-                                                label="Execution Result"
-                                                className="mb-3"
-                                            >
-                                                <Form.Control
-                                                    as="textarea"
-                                                    placeholder="Leave a comment here"
-                                                    style={{ height: "100px" }}
-                                                />
-                                            </FloatingLabel>
-                                            <Stack
-                                                direction="horizontal"
-                                                gap={1}
-                                            >
+                                                                index={index}
+                                                                value={
+                                                                    assignment[
+                                                                        "code_template"
+                                                                    ]
+                                                                }
+                                                            />
+                                                        </Card.Body>
+                                                    </Card>
+                                                </div>
+                                                <FloatingLabel
+                                                    controlId="floatingTextarea2"
+                                                    label="Execution Result"
+                                                    className="mb-3"
+                                                >
+                                                    <Form.Control
+                                                        as="textarea"
+                                                        placeholder="Leave a comment here"
+                                                        style={{
+                                                            height: "100px",
+                                                        }}
+                                                    />
+                                                </FloatingLabel>
                                                 <Stack
                                                     direction="horizontal"
-                                                    gap={2}
-                                                    className="ms-auto"
+                                                    gap={1}
                                                 >
-                                                    <Button
-                                                        variant="primary"
-                                                        type="submit"
+                                                    <Stack
+                                                        direction="horizontal"
+                                                        gap={2}
+                                                        className="ms-auto"
                                                     >
-                                                        Execute
-                                                    </Button>
-                                                    <Button
-                                                        variant="primary"
-                                                        type="submit"
-                                                    >
-                                                        Submit
-                                                    </Button>
+                                                        <Button
+                                                            variant="primary"
+                                                            type="submit"
+                                                        >
+                                                            Execute
+                                                        </Button>
+                                                        <Button
+                                                            variant="primary"
+                                                            type="submit"
+                                                        >
+                                                            Submit
+                                                        </Button>
+                                                    </Stack>
                                                 </Stack>
-                                            </Stack>
-                                        </Card.Body>
-                                    </Card>
-                                </Form>
-                            ))}
+                                            </Card.Body>
+                                        </Card>
+                                    </Form>
+                                )
+                            )}
                         </Card>
                     )
                 )}

@@ -40,3 +40,11 @@ export interface IJWT_decode{
     picture: string;
     sub: string;
 }
+
+export interface IPosts_Requst_Params {
+    page?: number;
+    limit?: number;
+    stars?: string;
+    publishDate?: string;
+    search?: string;
+}

@@ -1,17 +1,15 @@
 import { Stack } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import Header from "../component/Header";
-import useFetch from "../hooks/useFetch";
 import { Post } from "../interface";
 import PostList from "../component/PostsList";
+import { useSearchPostsQuery } from "../features/posts/postsApiSlice";
 
 export default function Posts({ posts }: { posts?: Post[] }) {
-    const url = "http://localhost:3000";
-    const [data, loading] = useFetch<Post[]>(
-        `${url}/api/posts?page=1`,
-        "GET",
-        {}
-    );
+    const { data, isLoading, error } = useSearchPostsQuery({
+        page: 1,
+        limit: 10,
+    });
     return (
         <div>
             <Header />
@@ -22,7 +20,7 @@ export default function Posts({ posts }: { posts?: Post[] }) {
                         New
                     </Link>
                 </Stack>
-                {loading ? (
+                {isLoading ? (
                     <div
                         className="spinner-border text-primary position-absolute top-50 start-50"
                         role="status"

@@ -13,10 +13,12 @@ import Markdown from "../component/Editor/Markdown";
 import Header from "../component/Header";
 import { useNavigate } from "react-router-dom";
 import { Assignment, Post } from "../interface";
+import { useAddNewPostMutation } from "../features/posts/postsApiSlice";
 
 export default function New() {
     const [post, setPost] = useState<Post>({} as Post);
     const [assingmentList, setAssignmentList] = useState<Assignment[]>([]);
+    const [addNewPost, { isLoading }] = useAddNewPostMutation();
     const navigate = useNavigate();
     function handlePostChange(e: React.ChangeEvent<HTMLInputElement>) {
         const { name, value } = e.target;
@@ -132,18 +134,7 @@ export default function New() {
                 }
             }
         }
-        async function fetchData(): Promise<any> {
-            const res = await fetch(`${url}/api/posts/new`, {
-                method: "POST",
-                body: JSON.stringify(post),
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            });
-            const json = await res.json();
-            return json;
-        }
-        const data = await fetchData();
+        const data = await addNewPost(post).unwrap();
         navigate(`/posts/${data._id}`);
     }
     return (

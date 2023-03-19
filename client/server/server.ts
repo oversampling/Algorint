@@ -7,9 +7,11 @@ import Post from './model/post';
 import Assignment from './model/assignment';
 import TestCase from './model/test_case';
 import ExpressError from './utils/ExpressError';
-import { INewPost, IRequestQuery_Posts } from './interface';
-import { OAuth2Client, UserRefreshClient } from 'google-auth-library';
+import { IJWT_decoded, INewPost, IRequestQuery_Posts } from './interface';
+import { Credentials, OAuth2Client, UserRefreshClient } from 'google-auth-library';
 import cookieParser from 'cookie-parser';
+import jwt_decode from "jwt-decode";
+import User from './model/user';
 
 const oAuth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
@@ -43,11 +45,10 @@ async function verify(token: string): Promise<Boolean> {
 }
 
 const isLoggedIn = async function (req: Request, res: Response, next: NextFunction) {
-    console.log(req.cookies)
     const token = req.cookies.token;
-    if (!token) return res.status(401).json({message: "Unauthorized"})
+    if (!token) return res.status(403).json({message: "Unauthorized"})
     const isValid = await verify(token);
-    if (!isValid) return res.status(401).json({message: "Unauthorized"})
+    if (!isValid) return res.status(403).json({message: "Unauthorized"})
     next();
 }
 
@@ -57,19 +58,47 @@ app.get("/", (req: Request, res: Response) => {
 })
 
 app.post('/auth/google', async (req, res) => {
-    const { tokens } = await oAuth2Client.getToken(req.body.code); // exchange code for tokens
+    const { tokens } : {tokens: Credentials} = await oAuth2Client.getToken(req.body.code); // exchange code for tokens
     res.cookie('token', tokens.id_token, { httpOnly: true, secure: true, maxAge: 24 * 60 * 60 * 1000, sameSite: "none" })
-    return res.json(tokens);
+    const id_token = tokens.id_token;
+    if (id_token){
+        const decoded_jwt: IJWT_decoded = jwt_decode(id_token);
+        // Find user in database
+        const user = await User.findOne({googleId: decoded_jwt.sub});
+        if (user){
+            return res.json({"tokens": id_token});
+        } else {
+            const newUser = new User({
+                googleId: decoded_jwt.sub,
+                refresh_token: tokens.refresh_token,
+            })
+            await newUser.save();
+            return res.json({"tokens": id_token});
+        }
+    }else{
+        return res.status(403).json({message: "Unauthorized"})
+    }
   });
 
 app.post('/auth/google/refresh-token', async (req, res) => {
-    const user = new UserRefreshClient(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        req.body.refreshToken,
-    );
-    const { credentials } = await user.refreshAccessToken(); // optain new tokens
-    res.json(credentials);
+    const cookies = req.cookies;
+    if (!cookies.token) return res.status(403).json({message: "Unauthorized"})
+    const token = cookies.token;
+    res.clearCookie('token', { httpOnly: true, secure: true, sameSite: "none" })
+    const decoded_jwt: IJWT_decoded = jwt_decode(token);
+    const found_user = await User.findOne({googleId: decoded_jwt.sub});
+    if (found_user){
+        const user = new UserRefreshClient(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            found_user.refresh_token
+        );
+        const { credentials } = await user.refreshAccessToken(); // optain new tokens
+        console.log(credentials)
+        res.cookie('token', credentials.id_token, { httpOnly: true, secure: true, maxAge: 24 * 60 * 60 * 1000, sameSite: "none" })
+        res.json(credentials);
+    }
+    return res.status(403).json({message: "Unauthorized"})
 })
 
 app.get("/api/posts", isLoggedIn ,async (req: Request<{}, {}, IRequestQuery_Posts>, res: Response, next: NextFunction) => {
@@ -88,7 +117,7 @@ app.get("/api/posts", isLoggedIn ,async (req: Request<{}, {}, IRequestQuery_Post
         if (options.page < 1) throw new ExpressError("Page number must be greater than 0", 400)
         if (options.limit < 1) throw new ExpressError("Limit must be greater than 0", 400)
         if (options.search && options.search !== ""){
-            const posts = await Post.find({$text: {$search: options.search.toString()}}).populate("assignments").populate({
+            const posts = await Post.find({$text: {$search: options.search.toString()}, isPublic: true}).populate("assignments").populate({
                 path: "assignments",
                 populate: {
                     path: "test_cases"
@@ -129,7 +158,6 @@ app.get("/api/posts/:id", isLoggedIn ,async (req: Request, res: Response, next: 
 app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const body: INewPost = req.body;
-        console.log(JSON.stringify(body));
         const post = new Post({
             title: body.title,
             description: body.description,
