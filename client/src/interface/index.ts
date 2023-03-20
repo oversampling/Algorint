@@ -48,3 +48,12 @@ export interface IPosts_Requst_Params {
     publishDate?: string;
     search?: string;
 }
+
+export interface ICode_Execution_Body {
+    code: string;
+    language: string;
+}
+
+export interface IAssignment_Code_Execution extends ICode_Execution_Body {
+    index: number;
+}

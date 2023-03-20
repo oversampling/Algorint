@@ -12,6 +12,7 @@ import { Credentials, OAuth2Client, UserRefreshClient } from 'google-auth-librar
 import cookieParser from 'cookie-parser';
 import jwt_decode from "jwt-decode";
 import User from './model/user';
+import axios from 'axios';
 
 const oAuth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
@@ -80,7 +81,7 @@ app.post('/auth/google', async (req, res) => {
     }
   });
 
-app.post('/auth/google/refresh-token', async (req, res) => {
+app.get('/auth/google/refresh-token', async (req, res) => {
     const cookies = req.cookies;
     if (!cookies.token) return res.status(403).json({message: "Unauthorized"})
     const token = cookies.token;
@@ -190,6 +191,27 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
     } catch (error) {
         next(error)
     }
+
+})
+
+app.post("/api/posts/assignment/execute", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
+    const {code, language} = req.body;
+    const response = await axios.post("http://localhost/make_submission", {
+        code,
+        language,
+        test_cases: [""],
+        input: [""]
+    })
+    res.json({submission_token: response.data})
+})
+
+app.get("/api/posts/assignment/fetch_result/:submission_token", isLoggedIn,  async (req: Request, res: Response, next: NextFunction) => {
+    const { submission_token } = req.params
+    const response = await axios.get(`http://localhost/retrieve_submission/${submission_token}`)
+    res.json(response.data)
+})
+
+app.post("/api/posts/assignment/submit", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
 
 })
 

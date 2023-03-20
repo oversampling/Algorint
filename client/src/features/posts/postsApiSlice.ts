@@ -1,5 +1,5 @@
 import { apiSlice } from "../../app/api/apiSlice";
-import { IPosts_Requst_Params, Post } from "../../interface";
+import { ICode_Execution_Body, IPosts_Requst_Params, Post } from "../../interface";
 
 export const postsApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
@@ -22,10 +22,23 @@ export const postsApiSlice = apiSlice.injectEndpoints({
                 url: `/api/posts/${id}`,
                 method: 'GET'
             })
+        }),
+        executeCode: builder.mutation({
+            query: (body: ICode_Execution_Body) => ({
+                url: '/api/posts/assignment/execute',
+                method: 'POST',
+                body: body
+            })
+        }),
+        fetchExecutionResult: builder.mutation({
+            query: (submission_token: string) => ({
+                url: `/api/posts/assignment/fetch_result/${submission_token}`,
+                method: 'GET'
+            })
         })
     })
 })
 
 export const {
-    /*useGetAllPostsQuery,*/ useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery
+    useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation
 } = postsApiSlice
