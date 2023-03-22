@@ -1,15 +1,15 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Types } from "mongoose";
 
-export interface IAssignment {
+export interface IAssignment{
     question: string,
     language: string,
     code_template: string,
     test_cases: [
-        Schema.Types.ObjectId,
+        Types.ObjectId,
     ]
 }
 
-const AssignmentSchema = new Schema({
+const AssignmentSchema = new Schema<IAssignment>({
     question: {
         type: String,
         required: true,
@@ -17,7 +17,7 @@ const AssignmentSchema = new Schema({
     language: String,
     code_template: String,
     test_cases: [{
-        type: Schema.Types.ObjectId,
+        type: Types.ObjectId,
         ref: "TestCase"
     }]
 });

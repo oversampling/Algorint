@@ -7,10 +7,12 @@ import MarkdownPreview from "../component/MarkdownPreview";
 import {
     useExecuteCodeMutation,
     useFetchExecutionResultMutation,
+    useSubmitCodeMutation,
     useViewPostQuery,
 } from "../features/posts/postsApiSlice";
 import {
     IAssignment_Code_Execution,
+    IAssignment_Code_Submission,
     ICode_Execution_Body,
     Post,
 } from "../interface";
@@ -26,6 +28,8 @@ export default function Posts() {
         useExecuteCodeMutation();
     const [fetchExecutionResult, { isLoading: execution_result }] =
         useFetchExecutionResultMutation();
+    const [submitCode, { isLoading: submission_reuslt }] =
+        useSubmitCodeMutation();
     useEffect(() => {
         if (data) {
             if (data.assignments.length > 0) {
@@ -91,6 +95,34 @@ export default function Posts() {
             }
         }
     }
+    async function fetchSubmissionResultLoop(
+        max_retries: number,
+        submission_token: string,
+        ms: number,
+        index: number
+    ) {
+        for (let i = 0; i < max_retries; i++) {
+            const response = await fetchExecutionResultWithSleep(
+                submission_token,
+                ms
+            );
+            if (response.status === "done execution") {
+                const textarea = document.getElementById(
+                    `execution-result-${index}`
+                ) as HTMLInputElement;
+                if (textarea != null) {
+                    let result: string = "";
+                    for (let i = 0; i < response.stdout.length; i++) {
+                        result += `Test Case ${i + 1} : ${
+                            response.result[i] ? "Passed" : "Failed"
+                        }\n`;
+                    }
+                    textarea.value = result;
+                }
+                break;
+            }
+        }
+    }
     async function handle_execution(assignmentIndex: number) {
         if (assignmentCode) {
             const { code, language, index }: IAssignment_Code_Execution =
@@ -118,6 +150,47 @@ export default function Posts() {
             execution_button && (execution_button.disabled = false);
             execution_result && (execution_result.disabled = false);
             submit_button && (submit_button.disabled = false);
+        }
+    }
+    async function handle_submit(assignmentIndex: number) {
+        console.log(assignmentIndex);
+        if (assignmentCode) {
+            const { code, language, index }: IAssignment_Code_Execution =
+                assignmentCode[assignmentIndex];
+            if (data?.assignments[index]) {
+                if (data.assignments[index]._id) {
+                    const submit_button = document.getElementById(
+                        `btn-execute-${index}`
+                    ) as HTMLInputElement;
+                    const execution_button = document.getElementById(
+                        `btn-submit-${index}`
+                    ) as HTMLInputElement;
+                    const execution_result = document.getElementById(
+                        `execution-result-${index}`
+                    ) as HTMLInputElement;
+                    execution_result && (execution_result.value = "");
+                    execution_result && (execution_result.disabled = true);
+                    execution_button && (execution_button.disabled = true);
+                    const submission: IAssignment_Code_Submission = {
+                        code,
+                        language,
+                        assignment_id: data.assignments[index]._id || "",
+                        index,
+                    };
+                    const response = await submitCode(submission).unwrap();
+                    const submission_token: string = response.submission_token;
+                    console.log(submission_token);
+                    await fetchSubmissionResultLoop(
+                        3,
+                        submission_token,
+                        2000,
+                        index
+                    );
+                    execution_button && (execution_button.disabled = false);
+                    execution_result && (execution_result.disabled = false);
+                    submit_button && (submit_button.disabled = false);
+                }
+            }
         }
     }
     return (
@@ -273,8 +346,12 @@ export default function Posts() {
                                                         </Button>
                                                         <Button
                                                             variant="primary"
-                                                            type="submit"
                                                             id={`btn-submit-${index}`}
+                                                            onClick={() => {
+                                                                handle_submit(
+                                                                    index
+                                                                );
+                                                            }}
                                                         >
                                                             Submit
                                                         </Button>

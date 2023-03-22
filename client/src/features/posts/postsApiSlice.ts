@@ -30,6 +30,13 @@ export const postsApiSlice = apiSlice.injectEndpoints({
                 body: body
             })
         }),
+        submitCode: builder.mutation({
+            query: (body: ICode_Execution_Body) => ({
+                url: '/api/posts/assignment/submit',
+                method: 'POST',
+                body: body
+            })
+        }),
         fetchExecutionResult: builder.mutation({
             query: (submission_token: string) => ({
                 url: `/api/posts/assignment/fetch_result/${submission_token}`,
@@ -40,5 +47,5 @@ export const postsApiSlice = apiSlice.injectEndpoints({
 })
 
 export const {
-    useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation
+    useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation, useSubmitCodeMutation
 } = postsApiSlice

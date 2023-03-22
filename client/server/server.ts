@@ -4,7 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import mongoose from 'mongoose';
 import Post from './model/post';
-import Assignment from './model/assignment';
+import Assignment, { IAssignment } from './model/assignment';
 import TestCase from './model/test_case';
 import ExpressError from './utils/ExpressError';
 import { IJWT_decoded, INewPost, IRequestQuery_Posts } from './interface';
@@ -97,7 +97,7 @@ app.get('/auth/google/refresh-token', async (req, res) => {
         const { credentials } = await user.refreshAccessToken(); // optain new tokens
         console.log(credentials)
         res.cookie('token', credentials.id_token, { httpOnly: true, secure: true, maxAge: 24 * 60 * 60 * 1000, sameSite: "none" })
-        res.json(credentials);
+        return res.json({"tokens": credentials.id_token});
     }
     return res.status(403).json({message: "Unauthorized"})
 })
@@ -212,7 +212,18 @@ app.get("/api/posts/assignment/fetch_result/:submission_token", isLoggedIn,  asy
 })
 
 app.post("/api/posts/assignment/submit", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
-
+    const {code, language, assignment_id} = req.body;
+    const assignment: IAssignment | null = await Assignment.findById(assignment_id).populate("test_cases")
+    if (!assignment) return res.status(404).json({message: "Assignment not found"})
+    const stdin: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdin)
+    const stdout: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdout)
+    const response = await axios.post("http://localhost/make_submission", {
+        code,
+        language,
+        test_cases: stdout,
+        input: stdin
+    })
+    return res.json({submission_token: response.data})
 })
 
 app.all("*", (req: Request, res:Response, next: NextFunction) => {

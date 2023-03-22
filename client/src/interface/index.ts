@@ -8,6 +8,7 @@ export interface Test_Case {
 }
 
 export interface Assignment {
+    _id?: string;
     question: string;
     code_template: string;
     language: string;
@@ -56,4 +57,8 @@ export interface ICode_Execution_Body {
 
 export interface IAssignment_Code_Execution extends ICode_Execution_Body {
     index: number;
+}
+
+export interface IAssignment_Code_Submission extends IAssignment_Code_Execution {
+    assignment_id: string;
 }
