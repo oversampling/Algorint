@@ -24,7 +24,7 @@ const app: Express = express();
 mongoose.connect('mongodb://127.0.0.1:27017/algorint')
   .then(() => console.log('Mongodb Connected'));
 
-app.use(cors({origin: "http://localhost:5173", credentials: true}))
+app.use(cors({origin: ["http://localhost:5173", "https://www.chanjinyee.online"], credentials: true}))
 app.use(express.json())
 app.use(cookieParser())
 app.use(express.urlencoded({ extended: true }))
@@ -100,6 +100,24 @@ app.get('/auth/google/refresh-token', async (req, res) => {
         return res.json({"tokens": credentials.id_token});
     }
     return res.status(403).json({message: "Unauthorized"})
+})
+
+app.get("/auth/logout", async (req: Request, res: Response) => {
+    const cookies = req.cookies
+    if (!cookies.token) return res.status(403).json({message: "Unauthorized"})
+    const token = cookies.token;
+    if (token){
+        const decoded_jwt: IJWT_decoded = jwt_decode(token);
+        // Find user in database
+        const user = await User.findOne({googleId: decoded_jwt.sub});
+        if (user){
+            user.refresh_token = "";
+            const result = await user.save();
+        }
+    }
+
+    res.clearCookie('token', { httpOnly: true, secure: true, sameSite: "none" })
+    return res.status(200).json({message: "Logout successful"})
 })
 
 app.get("/api/posts", isLoggedIn ,async (req: Request<{}, {}, IRequestQuery_Posts>, res: Response, next: NextFunction) => {

@@ -20,14 +20,15 @@ const baseQueryWithReauth = async (args: string | FetchArgs, api: BaseQueryApi, 
     if (result?.error?.status === 403) {
         console.log('sending refresh token')
         // send refresh token to get new access token
-        const refreshResult = await baseQuery('/auth/google/refresh-token', api, extraOptions)
+        const refreshResult: any = await baseQuery('/auth/google/refresh-token', api, extraOptions)
         console.log(refreshResult)
         if (refreshResult?.data) {
             const user = (api.getState() as RootState).auth.user
             // store the new token
-            api.dispatch(setCredentials({ token: refreshResult.data as string, user }))
+            api.dispatch(setCredentials({ token: refreshResult.data.token as string, user }))
             // retry the original query with new access token
             result = await baseQuery(args, api, extraOptions)
+            console.log(result)
         } else {
             api.dispatch(logOut())
         }

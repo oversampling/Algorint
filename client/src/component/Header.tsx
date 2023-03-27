@@ -1,28 +1,52 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Button from "react-bootstrap/Button";
 import Container from "react-bootstrap/Container";
 import Form from "react-bootstrap/Form";
 import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
-import { Stack } from "react-bootstrap";
-import { setCredentials } from "../features/auth/authSlice";
+import {
+    Figure,
+    ListGroup,
+    OverlayTrigger,
+    Popover,
+    PopoverBody,
+    PopoverHeader,
+    Stack,
+} from "react-bootstrap";
+import { selectCurrentToken, setCredentials } from "../features/auth/authSlice";
 import jwt_decode from "jwt-decode";
 import { IJWT_decode } from "../interface";
-import { useGoogleLoginMutation } from "../features/auth/authApiSlice";
-import { useDispatch } from "react-redux";
+import {
+    useGoogleLoginMutation,
+    useLogoutMutation,
+} from "../features/auth/authApiSlice";
+import { useDispatch, useSelector } from "react-redux";
 
 export default function Header() {
     const navigate = useNavigate();
     const [login] = useGoogleLoginMutation();
     const dispatch = useDispatch();
+    const token = useSelector(selectCurrentToken);
+    const [logout] = useLogoutMutation();
+    const [name, setName] = useState<string>("");
+    const [email, setEmail] = useState<string>("");
+    const [picture, setPicture] = useState<string>("");
     const onSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         let target = e.target as HTMLFormElement;
         navigate(`/posts/search?search=${target["search"].value || ""}`);
     };
     document.documentElement.setAttribute("data-color-mode", "light");
+    useEffect(() => {
+        if (token) {
+            let decoded_jwt: IJWT_decode = jwt_decode(token);
+            setName(decoded_jwt.name);
+            setEmail(decoded_jwt.email);
+            setPicture(decoded_jwt.picture);
+        }
+    }, []);
     const googleLogin = useGoogleLogin({
         onSuccess: async ({ code }) => {
             try {
@@ -60,19 +84,134 @@ export default function Header() {
                         <Nav.Link href="#action1">About</Nav.Link>
                     </Nav>
                     <Form className="d-flex" onSubmit={onSearchSubmit}>
-                        <Stack direction="horizontal" gap={1}>
-                            <Form.Control
-                                type="search"
-                                placeholder="Search"
-                                className="me-2"
-                                aria-label="Search"
-                                name="search"
-                            />
-                            <Button variant="outline-success" type="submit">
-                                Search
-                            </Button>
-                            <Button onClick={googleLogin}>Login</Button>
-                        </Stack>
+                        {token ? (
+                            <Stack
+                                direction="horizontal"
+                                gap={1}
+                                style={{ width: "100%" }}
+                            >
+                                <Form.Control
+                                    type="search"
+                                    placeholder="Search"
+                                    className="me-2"
+                                    aria-label="Search"
+                                    name="search"
+                                />
+                                <Button
+                                    variant="outline-success ms-auto"
+                                    type="submit"
+                                >
+                                    Search
+                                </Button>
+                                <OverlayTrigger
+                                    trigger="click"
+                                    placement="bottom"
+                                    overlay={
+                                        <Popover>
+                                            <PopoverHeader
+                                                style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                }}
+                                            >
+                                                <Figure className="d-flex justify-content-center align-items-center">
+                                                    <Figure.Image
+                                                        className="rounded-circle"
+                                                        width={100}
+                                                        height={100}
+                                                        alt="171x180"
+                                                        src={picture}
+                                                    />
+                                                </Figure>
+                                                <p className="text-center mb-0">
+                                                    {name}
+                                                </p>
+                                                <p className="text-center mb-1">
+                                                    {email}
+                                                </p>
+                                            </PopoverHeader>
+                                            <PopoverBody
+                                                style={{ padding: "0" }}
+                                            >
+                                                <ListGroup variant="flush">
+                                                    <ListGroup.Item
+                                                        as="li"
+                                                        className="text-center"
+                                                        onClick={() => {
+                                                            navigate("/posts");
+                                                        }}
+                                                        style={{
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        Posts
+                                                    </ListGroup.Item>
+                                                    <ListGroup.Item
+                                                        as="li"
+                                                        className="text-center"
+                                                        style={{
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        Assignments
+                                                    </ListGroup.Item>
+                                                    <ListGroup.Item
+                                                        as="li"
+                                                        className="text-center"
+                                                        style={{
+                                                            cursor: "pointer",
+                                                        }}
+                                                        onClick={async () => {
+                                                            try {
+                                                                const payload =
+                                                                    await logout(
+                                                                        ""
+                                                                    ).unwrap();
+                                                                dispatch(
+                                                                    setCredentials(
+                                                                        {
+                                                                            token: "",
+                                                                            user: "",
+                                                                        }
+                                                                    )
+                                                                );
+                                                                navigate("/");
+                                                            } catch (e) {
+                                                                console.error(
+                                                                    e
+                                                                );
+                                                            }
+                                                        }}
+                                                    >
+                                                        Logout Out
+                                                    </ListGroup.Item>
+                                                </ListGroup>
+                                            </PopoverBody>
+                                        </Popover>
+                                    }
+                                >
+                                    <a
+                                        className="ms-auto"
+                                        style={{
+                                            cursor: "pointer",
+                                            marginLeft: "8px",
+                                        }}
+                                        onClick={() => {}}
+                                    >
+                                        <img
+                                            src={picture && picture}
+                                            className="rounded-circle"
+                                            width={40}
+                                            height={40}
+                                        />
+                                    </a>
+                                </OverlayTrigger>
+                            </Stack>
+                        ) : (
+                            <Stack direction="horizontal" gap={1}>
+                                <Button onClick={googleLogin}>Login</Button>
+                            </Stack>
+                        )}
                     </Form>
                 </Navbar.Collapse>
             </Container>
