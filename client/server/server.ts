@@ -67,6 +67,8 @@ app.post('/auth/google', async (req, res) => {
         // Find user in database
         const user = await User.findOne({googleId: decoded_jwt.sub});
         if (user){
+            tokens.refresh_token && (user.refresh_token = tokens.refresh_token);
+            await user.save();
             return res.json({"tokens": id_token});
         } else {
             const newUser = new User({
