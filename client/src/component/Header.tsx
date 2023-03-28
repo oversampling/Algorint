@@ -71,7 +71,7 @@ export default function Header() {
         },
     });
     return (
-        <Navbar bg="light" expand="lg">
+        <Navbar bg="light" expand="lg" className="shadow-sm bg-body rounded">
             <Container fluid>
                 <Navbar.Brand href="#">UTAR Open Source</Navbar.Brand>
                 <Navbar.Toggle aria-controls="navbarScroll" />
@@ -81,7 +81,17 @@ export default function Header() {
                         style={{ maxHeight: "100px" }}
                         navbarScroll
                     >
-                        <Nav.Link href="#action1">About</Nav.Link>
+                        {token ? (
+                            <Nav.Link
+                                onClick={() => {
+                                    navigate("/posts");
+                                }}
+                            >
+                                Home
+                            </Nav.Link>
+                        ) : (
+                            <Nav.Link href="/about">About</Nav.Link>
+                        )}
                     </Nav>
                     <Form className="d-flex" onSubmit={onSearchSubmit}>
                         {token ? (
@@ -144,16 +154,19 @@ export default function Header() {
                                                             cursor: "pointer",
                                                         }}
                                                     >
-                                                        Posts
+                                                        Home
                                                     </ListGroup.Item>
                                                     <ListGroup.Item
                                                         as="li"
                                                         className="text-center"
+                                                        onClick={() => {
+                                                            navigate("/posts");
+                                                        }}
                                                         style={{
                                                             cursor: "pointer",
                                                         }}
                                                     >
-                                                        Assignments
+                                                        My Account
                                                     </ListGroup.Item>
                                                     <ListGroup.Item
                                                         as="li"

@@ -1,8 +1,8 @@
 import { Card, Stack } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import { Post } from "../interface";
-import parse from "html-react-parser";
 import Showdown from "showdown";
+import Badge from "react-bootstrap/Badge";
 export default function PostList({ posts }: { posts?: Post[] }) {
     const showdown = Showdown,
         converter = new showdown.Converter();
@@ -14,28 +14,39 @@ export default function PostList({ posts }: { posts?: Post[] }) {
                         posts.map(
                             (post, index) =>
                                 post._id && (
-                                    <Card className="mb-3" key={index}>
+                                    <Card
+                                        className="mb-3 shadow-sm bg-body rounded border-0"
+                                        key={index}
+                                    >
                                         <Card.Header>
                                             <Stack direction="horizontal">
-                                                <div className="fw-light fs-4 ">
-                                                    {post.title}
+                                                <div>
+                                                    <span className="fw-light fs-4">
+                                                        {post.title}
+                                                    </span>
+                                                    {post.assignments.length >
+                                                        0 && (
+                                                        <Badge
+                                                            bg="info"
+                                                            className="mx-1"
+                                                        >
+                                                            {
+                                                                post.assignments
+                                                                    .length
+                                                            }{" "}
+                                                            Assignments
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 <div className="ms-auto">
                                                     {post.stars}{" "}
-                                                    <i className="fa-regular fa-star"></i>
+                                                    <span className="mx-1">
+                                                        <i className="fa-duotone fa-caret-up fa-xl"></i>
+                                                    </span>
                                                 </div>
                                             </Stack>
                                         </Card.Header>
                                         <Card.Body>
-                                            <div>
-                                                <div>
-                                                    {parse(
-                                                        converter.makeHtml(
-                                                            post.description
-                                                        )
-                                                    )}
-                                                </div>
-                                            </div>
                                             <Stack direction="horizontal">
                                                 <Link
                                                     to={`/posts/${post._id}`}
@@ -43,7 +54,7 @@ export default function PostList({ posts }: { posts?: Post[] }) {
                                                 >
                                                     View
                                                 </Link>
-                                                <div className="ms-auto">
+                                                <div className="ms-auto text-muted">
                                                     {post.publishDate &&
                                                         `${
                                                             new Date(

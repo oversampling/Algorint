@@ -140,256 +140,288 @@ export default function New() {
     return (
         <div>
             <Header />
-            <div style={{ marginLeft: 15, marginRight: 15 }}>
-                <Form onSubmit={savePost}>
-                    <Card style={{ marginTop: 15, marginBottom: 15 }}>
-                        <Card.Header>
-                            <Stack direction="horizontal" gap={3}>
-                                <div>New Post</div>
-                                <Form.Check
-                                    className="ms-auto"
-                                    type="switch"
-                                    id="isPublic"
-                                    name="isPublic"
-                                    label={`Private`}
-                                    onChange={handlePostChange}
-                                />
-                            </Stack>
-                        </Card.Header>
-                        <Card.Body>
-                            <Form.Group className="mb-3">
-                                <Form.Label>Post Title</Form.Label>
-                                <Form.Control
-                                    type="text"
-                                    maxLength={100}
-                                    required
-                                    name="title"
-                                    onChange={handlePostChange}
-                                    placeholder="Enter Post Title"
-                                />
-                            </Form.Group>
-                            <Form.Group className="mb-3">
-                                <Form.Label>Description</Form.Label>
-                                <Markdown
-                                    onChange={handlePostDescriptionChange}
-                                />
-                            </Form.Group>
-                            {assingmentList?.map((assignment, index) => (
-                                <Card className="mb-3" key={index + 1}>
-                                    <Card.Header>
-                                        Assignment {index + 1}
-                                    </Card.Header>
-                                    <Card.Body>
-                                        <>
-                                            <Form.Group className="mb-3">
-                                                <Form.Label>
-                                                    Assignment Question
-                                                </Form.Label>
-                                                <Markdown
-                                                    index={index}
-                                                    onChange={
-                                                        handleAssignmentQuestionChange
-                                                    }
-                                                />
-                                            </Form.Group>
-                                            <Form.Label column sm="5">
-                                                Code Template
-                                            </Form.Label>
-                                            <Card className="mb-3">
+            <div className="container mt-3">
+                <div className="row justify-content-center">
+                    <div className="col-8">
+                        <Form onSubmit={savePost}>
+                            <Card className="shadow-sm bg-body rounded border-0 mb-2">
+                                <Card.Header>
+                                    <Stack direction="horizontal" gap={3}>
+                                        <div>New Post</div>
+                                        <Form.Check
+                                            className="ms-auto"
+                                            type="switch"
+                                            id="isPublic"
+                                            name="isPublic"
+                                            label={`Private`}
+                                            onChange={handlePostChange}
+                                        />
+                                    </Stack>
+                                </Card.Header>
+                                <Card.Body>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Post Title</Form.Label>
+                                        <Form.Control
+                                            type="text"
+                                            maxLength={100}
+                                            required
+                                            name="title"
+                                            onChange={handlePostChange}
+                                            placeholder="Enter Post Title"
+                                        />
+                                    </Form.Group>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Description</Form.Label>
+                                        <Markdown
+                                            onChange={
+                                                handlePostDescriptionChange
+                                            }
+                                        />
+                                    </Form.Group>
+                                    {assingmentList?.map(
+                                        (assignment, index) => (
+                                            <Card
+                                                className="mb-3"
+                                                key={index + 1}
+                                            >
                                                 <Card.Header>
-                                                    <Form.Select
-                                                        aria-label="Default select example"
-                                                        className="w-25"
-                                                        name="language"
-                                                        onChange={(e) =>
-                                                            onLanguageChange(
-                                                                e,
-                                                                index
-                                                            )
-                                                        }
-                                                    >
-                                                        <option value="python">
-                                                            Python
-                                                        </option>
-                                                        <option value="nodejs">
-                                                            NodeJS
-                                                        </option>
-                                                        <option value="rust">
-                                                            Rust
-                                                        </option>
-                                                        <option value="cpp">
-                                                            C++
-                                                        </option>
-                                                        <option value="c">
-                                                            C
-                                                        </option>
-                                                    </Form.Select>
+                                                    Assignment {index + 1}
                                                 </Card.Header>
                                                 <Card.Body>
-                                                    <Code
-                                                        language={
-                                                            assignment[
-                                                                "language"
-                                                            ] === undefined
-                                                                ? "python"
-                                                                : assignment[
-                                                                      "language"
-                                                                  ]
-                                                        }
-                                                        index={index}
-                                                        onCode={onCodeChange}
-                                                    />
-                                                </Card.Body>
-                                            </Card>
-                                            <Form.Label
-                                                column
-                                                sm="5"
-                                                className="d-block"
-                                            >
-                                                Assignment Test Settings
-                                            </Form.Label>
-                                            {assignment["test_cases"]?.map(
-                                                (test, testIndex) => {
-                                                    return (
-                                                        <Card
-                                                            className="mb-3"
-                                                            key={testIndex}
+                                                    <>
+                                                        <Form.Group className="mb-3">
+                                                            <Form.Label>
+                                                                Assignment
+                                                                Question
+                                                            </Form.Label>
+                                                            <Markdown
+                                                                index={index}
+                                                                onChange={
+                                                                    handleAssignmentQuestionChange
+                                                                }
+                                                            />
+                                                        </Form.Group>
+                                                        <Form.Label
+                                                            column
+                                                            sm="5"
                                                         >
+                                                            Code Template
+                                                        </Form.Label>
+                                                        <Card className="mb-3">
+                                                            <Card.Header>
+                                                                <Form.Select
+                                                                    aria-label="Default select example"
+                                                                    className="w-25"
+                                                                    name="language"
+                                                                    onChange={(
+                                                                        e
+                                                                    ) =>
+                                                                        onLanguageChange(
+                                                                            e,
+                                                                            index
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <option value="python">
+                                                                        Python
+                                                                    </option>
+                                                                    <option value="nodejs">
+                                                                        NodeJS
+                                                                    </option>
+                                                                    <option value="rust">
+                                                                        Rust
+                                                                    </option>
+                                                                    <option value="cpp">
+                                                                        C++
+                                                                    </option>
+                                                                    <option value="c">
+                                                                        C
+                                                                    </option>
+                                                                </Form.Select>
+                                                            </Card.Header>
                                                             <Card.Body>
-                                                                <Form.Label>
-                                                                    Replace
-                                                                </Form.Label>
-                                                                <Row className="mb-3">
-                                                                    <Col>
-                                                                        <FloatingLabel
-                                                                            controlId="floatingTextarea2"
-                                                                            label="From"
-                                                                        >
-                                                                            <Form.Control
-                                                                                as="textarea"
-                                                                                placeholder="Leave a comment here"
-                                                                                name={`from`}
-                                                                                onChange={(
-                                                                                    e
-                                                                                ) => {
-                                                                                    onTestCasesChange(
-                                                                                        e,
-                                                                                        index,
-                                                                                        testIndex
-                                                                                    );
-                                                                                }}
-                                                                                style={{
-                                                                                    height: "100px",
-                                                                                }}
-                                                                            />
-                                                                        </FloatingLabel>
-                                                                    </Col>
-                                                                    <Col>
-                                                                        <FloatingLabel
-                                                                            controlId="floatingTextarea2"
-                                                                            label="To"
-                                                                        >
-                                                                            <Form.Control
-                                                                                as="textarea"
-                                                                                name="to"
-                                                                                onChange={(
-                                                                                    e
-                                                                                ) => {
-                                                                                    onTestCasesChange(
-                                                                                        e,
-                                                                                        index,
-                                                                                        testIndex
-                                                                                    );
-                                                                                }}
-                                                                                placeholder="Leave a comment here"
-                                                                                style={{
-                                                                                    height: "100px",
-                                                                                }}
-                                                                            />
-                                                                        </FloatingLabel>
-                                                                    </Col>
-                                                                </Row>
-                                                                <FloatingLabel
-                                                                    controlId="floatingTextarea2"
-                                                                    label="Stdin"
-                                                                    className="mb-3"
-                                                                >
-                                                                    <Form.Control
-                                                                        as="textarea"
-                                                                        placeholder="Leave a comment here"
-                                                                        name="stdin"
-                                                                        onChange={(
-                                                                            e
-                                                                        ) => {
-                                                                            onTestCasesChange(
-                                                                                e,
-                                                                                index,
-                                                                                testIndex
-                                                                            );
-                                                                        }}
-                                                                        style={{
-                                                                            height: "100px",
-                                                                        }}
-                                                                    />
-                                                                </FloatingLabel>
-                                                                <FloatingLabel
-                                                                    controlId="floatingTextarea2"
-                                                                    label="Stdout"
-                                                                    className="mb-3"
-                                                                >
-                                                                    <Form.Control
-                                                                        as="textarea"
-                                                                        placeholder="Leave a comment here"
-                                                                        name="stdout"
-                                                                        onChange={(
-                                                                            e
-                                                                        ) => {
-                                                                            onTestCasesChange(
-                                                                                e,
-                                                                                index,
-                                                                                testIndex
-                                                                            );
-                                                                        }}
-                                                                        style={{
-                                                                            height: "100px",
-                                                                        }}
-                                                                    />
-                                                                </FloatingLabel>
+                                                                <Code
+                                                                    language={
+                                                                        assignment[
+                                                                            "language"
+                                                                        ] ===
+                                                                        undefined
+                                                                            ? "python"
+                                                                            : assignment[
+                                                                                  "language"
+                                                                              ]
+                                                                    }
+                                                                    index={
+                                                                        index
+                                                                    }
+                                                                    onCode={
+                                                                        onCodeChange
+                                                                    }
+                                                                />
                                                             </Card.Body>
                                                         </Card>
-                                                    );
-                                                }
-                                            )}
-                                            <Button
-                                                variant="outline-info"
-                                                onClick={() =>
-                                                    addTestCaseClick(index)
-                                                }
-                                            >
-                                                Add Test Case
-                                            </Button>
-                                        </>
-                                    </Card.Body>
-                                </Card>
-                            ))}
-                            <Button
-                                variant="primary"
-                                onClick={addAssignmentClick}
-                            >
-                                Add Assignment
-                            </Button>
-                        </Card.Body>
-                    </Card>
-                    <Stack direction="horizontal">
-                        <Button
-                            variant="primary"
-                            type="submit"
-                            className="ms-auto"
-                        >
-                            Save Post
-                        </Button>
-                    </Stack>
-                </Form>
+                                                        <Form.Label
+                                                            column
+                                                            sm="5"
+                                                            className="d-block"
+                                                        >
+                                                            Assignment Test
+                                                            Settings
+                                                        </Form.Label>
+                                                        {assignment[
+                                                            "test_cases"
+                                                        ]?.map(
+                                                            (
+                                                                test,
+                                                                testIndex
+                                                            ) => {
+                                                                return (
+                                                                    <Card
+                                                                        className="mb-3"
+                                                                        key={
+                                                                            testIndex
+                                                                        }
+                                                                    >
+                                                                        <Card.Body>
+                                                                            <Form.Label>
+                                                                                Replace
+                                                                            </Form.Label>
+                                                                            <Row className="mb-3">
+                                                                                <Col>
+                                                                                    <FloatingLabel
+                                                                                        controlId="floatingTextarea2"
+                                                                                        label="From"
+                                                                                    >
+                                                                                        <Form.Control
+                                                                                            as="textarea"
+                                                                                            placeholder="Leave a comment here"
+                                                                                            name={`from`}
+                                                                                            onChange={(
+                                                                                                e
+                                                                                            ) => {
+                                                                                                onTestCasesChange(
+                                                                                                    e,
+                                                                                                    index,
+                                                                                                    testIndex
+                                                                                                );
+                                                                                            }}
+                                                                                            style={{
+                                                                                                height: "100px",
+                                                                                            }}
+                                                                                        />
+                                                                                    </FloatingLabel>
+                                                                                </Col>
+                                                                                <Col>
+                                                                                    <FloatingLabel
+                                                                                        controlId="floatingTextarea2"
+                                                                                        label="To"
+                                                                                    >
+                                                                                        <Form.Control
+                                                                                            as="textarea"
+                                                                                            name="to"
+                                                                                            onChange={(
+                                                                                                e
+                                                                                            ) => {
+                                                                                                onTestCasesChange(
+                                                                                                    e,
+                                                                                                    index,
+                                                                                                    testIndex
+                                                                                                );
+                                                                                            }}
+                                                                                            placeholder="Leave a comment here"
+                                                                                            style={{
+                                                                                                height: "100px",
+                                                                                            }}
+                                                                                        />
+                                                                                    </FloatingLabel>
+                                                                                </Col>
+                                                                            </Row>
+                                                                            <FloatingLabel
+                                                                                controlId="floatingTextarea2"
+                                                                                label="Stdin"
+                                                                                className="mb-3"
+                                                                            >
+                                                                                <Form.Control
+                                                                                    as="textarea"
+                                                                                    placeholder="Leave a comment here"
+                                                                                    name="stdin"
+                                                                                    onChange={(
+                                                                                        e
+                                                                                    ) => {
+                                                                                        onTestCasesChange(
+                                                                                            e,
+                                                                                            index,
+                                                                                            testIndex
+                                                                                        );
+                                                                                    }}
+                                                                                    style={{
+                                                                                        height: "100px",
+                                                                                    }}
+                                                                                />
+                                                                            </FloatingLabel>
+                                                                            <FloatingLabel
+                                                                                controlId="floatingTextarea2"
+                                                                                label="Stdout"
+                                                                                className="mb-3"
+                                                                            >
+                                                                                <Form.Control
+                                                                                    as="textarea"
+                                                                                    placeholder="Leave a comment here"
+                                                                                    name="stdout"
+                                                                                    onChange={(
+                                                                                        e
+                                                                                    ) => {
+                                                                                        onTestCasesChange(
+                                                                                            e,
+                                                                                            index,
+                                                                                            testIndex
+                                                                                        );
+                                                                                    }}
+                                                                                    style={{
+                                                                                        height: "100px",
+                                                                                    }}
+                                                                                />
+                                                                            </FloatingLabel>
+                                                                        </Card.Body>
+                                                                    </Card>
+                                                                );
+                                                            }
+                                                        )}
+                                                        <Button
+                                                            variant="outline-info"
+                                                            onClick={() =>
+                                                                addTestCaseClick(
+                                                                    index
+                                                                )
+                                                            }
+                                                        >
+                                                            Add Test Case
+                                                        </Button>
+                                                    </>
+                                                </Card.Body>
+                                            </Card>
+                                        )
+                                    )}
+                                    <Button
+                                        variant="primary"
+                                        onClick={addAssignmentClick}
+                                    >
+                                        Add Assignment
+                                    </Button>
+                                </Card.Body>
+                            </Card>
+                            <Stack direction="horizontal">
+                                <Button
+                                    variant="primary"
+                                    type="submit"
+                                    className="ms-auto"
+                                >
+                                    Save Post
+                                </Button>
+                            </Stack>
+                        </Form>
+                    </div>
+                </div>
             </div>
             <div>{JSON.stringify(post)}</div>
         </div>
