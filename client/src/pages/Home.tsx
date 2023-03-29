@@ -61,14 +61,14 @@ export default function Home() {
                                         and is expected to available to use in
                                         20 April 2023
                                     </p>
-                                    <p>
+                                    <div>
                                         Welcome to contribute at our GitHub
                                         <div>
                                             <a href="https://github.com/chan1992241/Algorint">
                                                 https://github.com/chan1992241/Algorint
                                             </a>
                                         </div>
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

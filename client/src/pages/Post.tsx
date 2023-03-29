@@ -369,6 +369,12 @@ export default function Posts() {
                                                         </Stack>
                                                     </Card.Body>
                                                 </Card>
+                                                <hr
+                                                    style={{
+                                                        width: "95%",
+                                                        margin: "auto",
+                                                    }}
+                                                />
                                             </Form>
                                         )
                                     )}

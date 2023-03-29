@@ -79,7 +79,7 @@ export default function New() {
     ) {
         const { name, value } = e.target;
         const list: Assignment[] = [...assingmentList];
-        if (list[index] === undefined) {
+        if (list[index] !== undefined) {
             list[index]["language"] = value;
             list[index]["code_template"] = "";
         }
@@ -256,6 +256,11 @@ export default function New() {
                                                                     }
                                                                     onCode={
                                                                         onCodeChange
+                                                                    }
+                                                                    value={
+                                                                        assignment[
+                                                                            "code_template"
+                                                                        ]
                                                                     }
                                                                 />
                                                             </Card.Body>
