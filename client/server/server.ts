@@ -178,36 +178,47 @@ app.get("/api/posts/:id", isLoggedIn ,async (req: Request, res: Response, next: 
 
 app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const body: INewPost = req.body;
-        const post = new Post({
-            title: body.title,
-            description: body.description,
-            isPublic: body.isPublic,
-            assignments: []
-        });
-        for (const assignment of body.assignments) {
-            const newAssignment = new Assignment({
-                question: assignment.question,
-                language: assignment.language || "python",
-                code_template: assignment.code_template,
-            });
-            await newAssignment.save();
-            if (assignment.test_cases){
-                for (const test_case of assignment.test_cases) {
-                    const newTestCase = new TestCase({
-                        stdin: test_case.stdin,
-                        stdout: test_case.stdout,
-                        inject: test_case.inject,
-                    });
-                    await newTestCase.save();
-                    newAssignment.test_cases.push(newTestCase._id);
-                }
+        const token = req.cookies.token;
+        if (token){
+            const decoded_jwt: IJWT_decoded = jwt_decode(token);
+            // Find user in database
+            const user = await User.findOne({googleId: decoded_jwt.sub}).populate("posts");
+            if (!user){
+                throw new ExpressError("User not found", 404)
             }
-            await newAssignment.save();
-            post.assignments.push(newAssignment._id);
+            const body: INewPost = req.body;
+            const post = new Post({
+                title: body.title,
+                description: body.description,
+                isPublic: body.isPublic,
+                assignments: []
+            });
+            for (const assignment of body.assignments) {
+                const newAssignment = new Assignment({
+                    question: assignment.question,
+                    language: assignment.language || "python",
+                    code_template: assignment.code_template,
+                });
+                await newAssignment.save();
+                if (assignment.test_cases){
+                    for (const test_case of assignment.test_cases) {
+                        const newTestCase = new TestCase({
+                            stdin: test_case.stdin,
+                            stdout: test_case.stdout,
+                            inject: test_case.inject,
+                        });
+                        await newTestCase.save();
+                        newAssignment.test_cases.push(newTestCase._id);
+                    }
+                }
+                await newAssignment.save();
+                post.assignments.push(newAssignment._id);
+            }
+            const savedPost = await post.save();
+            user.posts.push(savedPost._id);
+            await user.save();
+            res.status(200).json(savedPost)
         }
-        const savedPost = await post.save();
-        res.status(200).json(savedPost)
     } catch (error) {
         next(error)
     }
@@ -244,6 +255,38 @@ app.post("/api/posts/assignment/submit", isLoggedIn, async (req: Request, res: R
         input: stdin
     })
     return res.json({submission_token: response.data})
+})
+
+app.get("/api/acccount/posts", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.cookies.token;
+    if (token){
+        const decoded_jwt: IJWT_decoded = jwt_decode(token);
+        // Find user in database
+        const user = await User.findOne({googleId: decoded_jwt.sub}).populate("posts");
+        if (user){
+            return res.status(200).json(user.posts)
+        }
+    }
+    return res.status(400).json({message: "User not found"})
+})
+
+app.delete("/api/posts", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.cookies.token;
+    if (token){
+        const decoded_jwt: IJWT_decoded = jwt_decode(token);
+        // Find user in database
+        const user = await User.findOne({googleId: decoded_jwt.sub});
+        if (user){
+            const userPosts = user.posts;
+            if (userPosts.includes(req.body.post_id)){
+                user.posts.splice(userPosts.indexOf(req.body.post_id), 1)
+                await user.save();
+            }
+        }else {
+            return res.status(400).json({message: "User not found"})
+        }
+    }
+    return res.status(200).json({message: "Post deleted"})
 })
 
 app.all("*", (req: Request, res:Response, next: NextFunction) => {

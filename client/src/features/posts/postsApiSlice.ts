@@ -42,10 +42,24 @@ export const postsApiSlice = apiSlice.injectEndpoints({
                 url: `/api/posts/assignment/fetch_result/${submission_token}`,
                 method: 'GET'
             })
+        }),
+        fetchAccountPosts: builder.mutation({
+            query: () => ({
+                url: '/api/acccount/posts',
+                method: 'GET'
+            })
+        }),
+        deleteAccountPost: builder.mutation({
+            query: (post_id: string) => ({
+                url: `/api/posts`,
+                method: 'DELETE',
+                body: {post_id: post_id}
+            })
         })
     })
 })
 
 export const {
-    useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation, useSubmitCodeMutation
+    useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation, useSubmitCodeMutation, useFetchAccountPostsMutation,
+    useDeleteAccountPostMutation
 } = postsApiSlice

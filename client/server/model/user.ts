@@ -6,6 +6,9 @@ export interface IUser {
     starredPosts: [
         Types.ObjectId
     ],
+    posts: [
+        Types.ObjectId
+    ]
 }
 
 const userSchema = new Schema({
@@ -14,6 +17,9 @@ const userSchema = new Schema({
     starredPosts: [
         {type: Types.ObjectId, ref: "Post"}
     ],
+    posts: [
+        {type: Types.ObjectId, ref: "Post"}
+    ]
 });
 
 const User = mongoose.model<IUser>("User", userSchema);

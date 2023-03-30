@@ -14,6 +14,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import RequireAuth from "./features/auth/RequireAuth";
 import { Provider } from "react-redux";
 import { store } from "./app/store";
+import MyAccount from "./pages/MyAccount";
 
 const router = createBrowserRouter([
     {
@@ -36,6 +37,17 @@ const router = createBrowserRouter([
             {
                 path: "search",
                 element: <SearchPosts />,
+            },
+        ],
+    },
+    {
+        path: "/account",
+        errorElement: <ErrorPage />,
+        element: <RequireAuth />,
+        children: [
+            {
+                path: "",
+                element: <MyAccount />,
             },
         ],
     },

@@ -4,7 +4,7 @@ import Container from "react-bootstrap/Container";
 import Form from "react-bootstrap/Form";
 import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
 import {
     Figure,
@@ -42,9 +42,14 @@ export default function Header() {
     useEffect(() => {
         if (token) {
             let decoded_jwt: IJWT_decode = jwt_decode(token);
-            setName(decoded_jwt.name);
+            // There are no picture and name in refresh token
+            if (name === "" && picture === "") {
+                // If logined before
+                // Get name and picture from first login token
+                setName(decoded_jwt.name);
+                setPicture(decoded_jwt.picture);
+            }
             setEmail(decoded_jwt.email);
-            setPicture(decoded_jwt.picture);
         }
     }, []);
     const googleLogin = useGoogleLogin({
@@ -160,7 +165,9 @@ export default function Header() {
                                                         as="li"
                                                         className="text-center"
                                                         onClick={() => {
-                                                            navigate("/posts");
+                                                            navigate(
+                                                                "/account"
+                                                            );
                                                         }}
                                                         style={{
                                                             cursor: "pointer",
