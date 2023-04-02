@@ -7,7 +7,7 @@ import Post from './model/post';
 import Assignment, { IAssignment } from './model/assignment';
 import TestCase from './model/test_case';
 import ExpressError from './utils/ExpressError';
-import { IJWT_decoded, INewPost, IRequestQuery_Posts } from './interface';
+import { IJWT_decoded, INewPost, IPost_Update_Body, IRequestQuery_Posts } from './interface';
 import { Credentials, OAuth2Client, UserRefreshClient } from 'google-auth-library';
 import cookieParser from 'cookie-parser';
 import jwt_decode from "jwt-decode";
@@ -21,7 +21,7 @@ const oAuth2Client = new OAuth2Client(
   );
 
 const app: Express = express();
-mongoose.connect('mongodb://127.0.0.1:27017/algorint')
+mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/algorint")
   .then(() => console.log('Mongodb Connected'));
 
 app.use(cors({origin: ["http://localhost:5173", "https://www.chanjinyee.online"], credentials: true}))
@@ -29,7 +29,6 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(express.urlencoded({ extended: true }))
 process.env.ENV === "production" && app.use(express.static(path.join(__dirname, '../../dist')));
-
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 async function verify(token: string): Promise<Boolean> {
     try{
@@ -54,7 +53,7 @@ const isLoggedIn = async function (req: Request, res: Response, next: NextFuncti
 }
 
 app.get("/", (req: Request, res: Response) => {
-    process.env.ENV === "production" && res.sendFile(path.join(__dirname, './index.html'));
+    if (process.env.ENV === "production") return res.sendFile(path.join(__dirname, '../../dist/index.html'))
     res.json({message: "Hello World"})
 })
 
@@ -205,7 +204,7 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
                         const newTestCase = new TestCase({
                             stdin: test_case.stdin,
                             stdout: test_case.stdout,
-                            inject: test_case.inject,
+                            replace: test_case.replace ? test_case.replace : {from: "", to: ""},
                         });
                         await newTestCase.save();
                         newAssignment.test_cases.push(newTestCase._id);
@@ -287,6 +286,93 @@ app.delete("/api/posts", isLoggedIn, async (req: Request, res: Response, next: N
         }
     }
     return res.status(200).json({message: "Post deleted"})
+})
+
+app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>, res: Response, next: NextFunction) => {
+    const token = req.cookies.token;
+    const postBody: IPost_Update_Body = req.body;
+    if (token){
+        const decoded_jwt: IJWT_decoded = jwt_decode(token);
+        // Find user in database
+        const user = await User.findOne({googleId: decoded_jwt.sub});
+        if (user){
+            const userPosts = user.posts;
+            if (userPosts.includes(new mongoose.Types.ObjectId(req.body._id))){
+                const post = await Post.findById(req.body._id)
+                // Update Post
+                if (post){
+                    post.title = req.body.title;
+                    post.description = req.body.description;
+                    post.isPublic = req.body.isPublic;
+                    await post.save();
+                    // Update Post Assignment
+                    for (const assignment of postBody.assignments) {
+                        if (assignment._id){
+                            const assingmentToUpdate = await Assignment.findById(assignment._id)
+                            if (assingmentToUpdate){
+                                assingmentToUpdate.question = assignment.question;
+                                assingmentToUpdate.language = assignment.language || "python";
+                                assingmentToUpdate.code_template = assignment.code_template;
+                                await assingmentToUpdate.save();
+                                // Update Post Assignment Test Cases
+                                for (const test_case of assignment.test_cases) {
+                                    const testCaseToUpdate = await TestCase.findById(test_case._id)
+                                    if (testCaseToUpdate){
+                                        testCaseToUpdate.stdin = test_case.stdin;
+                                        testCaseToUpdate.stdout = test_case.stdout;
+                                        testCaseToUpdate.replace = test_case.replace;
+                                        await testCaseToUpdate.save();
+                                    }else{
+                                        const newTestCase = new TestCase({
+                                            stdin: test_case.stdin,
+                                            stdout: test_case.stdout,
+                                            replace: test_case.replace,
+                                        });
+                                        await newTestCase.save();
+                                        assingmentToUpdate.test_cases.push(newTestCase._id);
+                                        await assingmentToUpdate.save();
+                                    }
+                                }
+                            }
+                        }else{
+                            const newAssignment = new Assignment({
+                                question: assignment.question,
+                                language: assignment.language || "python",
+                                code_template: assignment.code_template,
+                            });
+                            await newAssignment.save();
+                            post.assignments.push(newAssignment._id);
+                            await post.save();
+                            // Update Post Assignment Test Cases
+                            for (const test_case of assignment.test_cases) {
+                                if (test_case._id){
+                                    const testCaseToUpdate = await TestCase.findById(test_case._id)
+                                    if (testCaseToUpdate){
+                                        testCaseToUpdate.stdin = test_case.stdin;
+                                        testCaseToUpdate.stdout = test_case.stdout;
+                                        testCaseToUpdate.replace = test_case.replace ? test_case.replace : {from: "", to: ""};
+                                        await testCaseToUpdate.save();
+                                    }
+                                }else{
+                                    const newTestCase = new TestCase({
+                                        stdin: test_case.stdin,
+                                        stdout: test_case.stdout,
+                                        replace: test_case.replace ? test_case.replace : {from: "", to: ""},
+                                    });
+                                    await newTestCase.save();
+                                    newAssignment.test_cases.push(newTestCase._id);
+                                    await newAssignment.save();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }else {
+            return res.status(400).json({message: "User not found"})
+        }
+    }
+    return res.status(200).json({message: "Post updated"})
 })
 
 app.all("*", (req: Request, res:Response, next: NextFunction) => {

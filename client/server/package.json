@@ -6,7 +6,7 @@
   "scripts": {
     "build": "rimraf build && npx tsc",
     "prestart": "npm run build",
-    "start": "node dist/server.js",
+    "start": "node build/server.js",
     "preserve": "npm run build",
     "serve": "concurrently \"npx tsc -w\" \"nodemon build/server.js\""
   },
@@ -25,7 +25,8 @@
     "google-auth-library": "^8.7.0",
     "jwt-decode": "^3.1.2",
     "mongoose": "^7.0.1",
-    "rimraf": "^4.2.0"
+    "rimraf": "^4.2.0",
+    "typescript": "^5.0.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.13",
