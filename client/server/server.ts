@@ -204,7 +204,7 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
                         const newTestCase = new TestCase({
                             stdin: test_case.stdin,
                             stdout: test_case.stdout,
-                            replace: test_case.replace ? test_case.replace : {from: "", to: ""},
+                            replace: test_case.replace ? test_case.replace : {from: "", to: ""}
                         });
                         await newTestCase.save();
                         newAssignment.test_cases.push(newTestCase._id);
