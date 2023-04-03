@@ -38,7 +38,7 @@ export default function PostList({
                                     <Stack direction="horizontal">
                                         <div>
                                             <span className="fw-light fs-4">
-                                                {post.title}
+                                                {atob(post.title)}
                                             </span>
                                             {post.assignments.length > 0 && (
                                                 <Badge
@@ -83,7 +83,7 @@ export default function PostList({
                                         {isAccountPosts && (
                                             <>
                                                 <Link
-                                                    to={`/posts/edit`}
+                                                    to={`/posts/edit/${post._id}`}
                                                     className="btn btn-success mx-1"
                                                 >
                                                     Edit

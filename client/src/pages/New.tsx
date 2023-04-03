@@ -134,6 +134,44 @@ export default function New() {
                 }
             }
         }
+        // Encode data to base64
+        post.description = btoa(post.description);
+        post.title = btoa(post.title);
+        for (let i = 0; i < post.assignments.length; i++) {
+            post.assignments[i].question = btoa(post.assignments[i].question);
+            post.assignments[i].code_template = btoa(
+                post.assignments[i].code_template
+            );
+            for (let j = 0; j < post.assignments[i].test_cases.length; j++) {
+                post.assignments[i].test_cases[j].stdin = btoa(
+                    post.assignments[i].test_cases[j].stdin
+                );
+                post.assignments[i].test_cases[j].stdout = btoa(
+                    post.assignments[i].test_cases[j].stdout
+                );
+                if (post.assignments[i].test_cases[j].replace === undefined) {
+                    post.assignments[i].test_cases[j].replace = {
+                        from: "",
+                        to: "",
+                    };
+                } else if (
+                    post.assignments[i].test_cases[j].replace.from === undefined
+                ) {
+                    post.assignments[i].test_cases[j].replace.from = "";
+                } else if (
+                    post.assignments[i].test_cases[j].replace.to === undefined
+                ) {
+                    post.assignments[i].test_cases[j].replace.to = "";
+                } else {
+                    post.assignments[i].test_cases[j].replace.from = btoa(
+                        post.assignments[i].test_cases[j].replace.from
+                    );
+                    post.assignments[i].test_cases[j].replace.to = btoa(
+                        post.assignments[i].test_cases[j].replace.to
+                    );
+                }
+            }
+        }
         const data = await addNewPost(post).unwrap();
         navigate(`/posts/${data._id}`);
     }

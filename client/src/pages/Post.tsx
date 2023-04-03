@@ -42,6 +42,10 @@ export default function Posts() {
                     };
                     newCode.push(newCodeItem);
                 }
+                // Decode from base64 to string
+                for (let i = 0; i < newCode.length; i++) {
+                    newCode[i].code = atob(newCode[i].code);
+                }
                 setassignmentCode(newCode);
             }
         }
@@ -220,7 +224,7 @@ export default function Posts() {
                                 <Card className="shadow-sm bg-body rounded border-0">
                                     <Card.Header>
                                         <Stack direction="horizontal" gap={3}>
-                                            <div>{data["title"]}</div>
+                                            <div>{atob(data["title"])}</div>
                                             <div className="ms-auto">
                                                 {data["stars"]}
                                                 <span className="mx-1">
@@ -236,7 +240,7 @@ export default function Posts() {
                                     </Card.Header>
                                     <Card.Body>
                                         <MarkdownPreview
-                                            value={data["description"]}
+                                            value={atob(data["description"])}
                                         />
                                     </Card.Body>
                                     <hr
@@ -262,11 +266,11 @@ export default function Posts() {
                                                                 Question
                                                             </Form.Label>
                                                             <MarkdownPreview
-                                                                value={
+                                                                value={atob(
                                                                     assignment[
                                                                         "question"
                                                                     ]
-                                                                }
+                                                                )}
                                                             />
                                                         </div>
                                                         <div className="mb-3">
