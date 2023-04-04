@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import base64
 import os
 from flask import Flask
 from dotenv import load_dotenv
@@ -61,10 +62,13 @@ def make_judge():
     submission = json.loads(submission)
     stdouts = submission["stdout"]
     stderr = submission["stderr"]
-    test_cases = submission["test_cases"]
+    test_cases: list = submission["test_cases"].copy()
     # Get result of each judgement based on stdout and test case
     results = []
     for index, stdout in enumerate(stdouts):
+        # Decode stdout and test case from base64 to string
+        stdout = base64.b64decode(stdout).decode()
+        test_cases[index] = base64.b64decode(test_cases[index]).decode()
         if (stderr[index] == ""):
             result = judge(stdout, test_cases[index])
         else:

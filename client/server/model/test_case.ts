@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 export interface ITestCase {
     stdin: string,
     stdout: string,
-    inject: {
+    replace: {
         from: string,
         to: string,
     }
@@ -14,7 +14,7 @@ export interface ITestCase {
 const TestCaseSchema = new Schema<ITestCase>({
     stdin: String,
     stdout: String,
-    inject: {
+    replace: {
         from: String,
         to: String,
     }

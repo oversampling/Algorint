@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import base64
 import io
 import tarfile
 from typing import Literal
@@ -36,6 +37,7 @@ class Sandbox:
             cpu_period=cpu_period,
             pids_limit=pids_limit,
             mem_limit=mem_limit,
+            # Executable file will be generated when compile, so mode shoudl be 'rw'
             volumes={f'{workdir}/code': {'bind': workdir, 'mode': 'rw'}})
         self.container.start()
         self.stdin = self.container.attach_socket(params={'stdin': 1, 'stdout': 0, 'stderr': 0, 'stream': 1})
@@ -181,6 +183,8 @@ class Worker():
         del sandbox
         return stdout, stderr
 
+    def transform_code(self, code: str, _from: str, _to:str):
+        return code.replace(_from, _to)
 
     def __execute(self, language) -> tuple[str, str]:
         try:
@@ -210,17 +214,18 @@ class Worker():
             f.write(input)
 
     def __clean_up(self, langauge):
-        os.remove("code/input.txt")
+        if (os.path.exists("code/input.txt")):
+            os.remove("code/input.txt")
         if (os.path.exists("code/code")):
             os.remove("code/code")
-        if (langauge == "cpp"):
+        if (os.path.exists("code/code.cpp")):
             os.remove("code/code.cpp")
-        elif (langauge == "c"):
+        elif (os.path.exists("code/code.c")):
             os.remove("code/code.c")
-        elif (langauge == "rust"):
+        elif (os.path.exists("code/code.rs")):
             os.remove("code/code.rs")
         else:
-            raise Exception("Language not supported")
+            print("File not found")
 
     def __callback(self, ch, method, properties, body):
         """
@@ -240,19 +245,46 @@ class Worker():
             None
         """
         data = json.loads(body.decode())
-        # Save the code, input to a file
-        self.save_code(data["code"], data["language"])
         # handle multiple input file
         submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result"]] = {
             "stdout": [],
             "stderr": [],
-            "test_cases": data["test_cases"]
+            "test_cases": data["test_cases"],
+            "replace": data["replace"]
         }
-        for code_input in data["input"]:
-            self.__save_input(code_input)
-            stdout, stderr = self.__execute(data["language"])
-            submission["stderr"].append(stderr)
-            submission["stdout"].append(stdout)
+        for index, code_input in enumerate(data["input"]):
+            # --------------------------------------------------------------------------
+            # Decode from base64 to string
+            # Decode data["code"] from base64
+            try:
+                code = base64.b64decode(data["code"]).decode()
+                # Decode code input
+                code_input = base64.b64decode(code_input).decode()
+                # Decode data["replace"]["from"] from base64 to string
+                _from = base64.b64decode(data["replace"][index]["from"]).decode()
+                # Decode data["replace"]["to"] from base64 to string
+                _to = base64.b64decode(data["replace"][index]["to"]).decode()
+                # --------------------------------------------------------------------------
+                # Replace the code
+                code = self.transform_code(code, _from, _to)
+                # Save the code, input to a file
+                self.save_code(code, data["language"])
+                # Save the stdin to a file
+                self.__save_input(code_input)
+                stdout, stderr = self.__execute(data["language"])
+                # --------------------------------------------------------------------------
+                # Encode the output to base64
+                stdout = base64.b64encode(stdout.encode('utf-8')).decode()
+                stderr = base64.b64encode(stderr.encode('utf-8')).decode()
+                # --------------------------------------------------------------------------
+                # Append the output to the submission
+                submission["stderr"].append(stderr)
+                submission["stdout"].append(stdout)
+            except Exception as e:
+                stderr = base64.b64encode(e.__str__().encode('utf-8')).decode()
+                submission["stderr"].append(stderr)
+                submission["stdout"].append("")
+                continue
         submission["status"] = "done execution"
         # Save the result to submission database
         self.redis_command(self.redis.set,

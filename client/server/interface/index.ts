@@ -4,14 +4,16 @@ export interface INewPost {
     isPublic: boolean,
     assignments: [
         {
+            _id?: string,
             question: string,
             language: string,
             code_template: string,
             test_cases: [
                 {
+                    _id?: string,
                     stdin: string,
                     stdout: string,
-                    inject: {
+                    replace: {
                         from: string,
                         to: string,
                     }
@@ -53,4 +55,8 @@ export interface IJWT_decoded {
     locale: string,
     iat: number,
     exp: number,
+}
+
+export interface IPost_Update_Body extends INewPost {
+    _id: string;
 }

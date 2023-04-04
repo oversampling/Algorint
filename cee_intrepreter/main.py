@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import base64
 import io
 import tarfile
 from typing import Literal
@@ -124,6 +125,9 @@ class Worker():
         with open(filename, "r") as f:
             return f.read()
 
+    def transform_code(self, code: str, _from: str, _to:str):
+        return code.replace(_from, _to)
+
     def identify_error(self, sandbox: Sandbox, process: Literal["Compile Time", "Run Time"]):
         try:
             sandbox.wait(timeout=sandbox.timeout)
@@ -205,17 +209,38 @@ class Worker():
             None
         """
         data = json.loads(body.decode())
-        # Save the code, input to a file
-        self.save_code(data["code"], data["language"])
         # handle multiple input file
         submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result"]] = {
             "stdout": [],
             "stderr": [],
-            "test_cases": data["test_cases"]
+            "test_cases": data["test_cases"],
+            "replace": data["replace"]
         }
-        for code_input in data["input"]:
+        for index, code_input in enumerate(data["input"]):
+            # --------------------------------------------------------------------------
+            # Decode from base64 to string
+            # Decode data["code"] from base64 to string
+            code = base64.b64decode(data["code"]).decode()
+            # Decode data["replace"]["from"] from base64 to string
+            _from = base64.b64decode(data["replace"][index]["from"]).decode()
+            # Decode data["replace"]["to"] from base64 to string
+            _to = base64.b64decode(data["replace"][index]["to"]).decode()
+            # Decode stdin from base64 to string
+            code_input = base64.b64decode(code_input).decode()
+            # --------------------------------------------------------------------------
+            # Replace the code
+            code = self.transform_code(code, _from, _to)
+            # Save the code, input to a file
+            self.save_code(code, data["language"])
+            # Save the stdin to a file
             self.__save_input(code_input)
             stdout, stderr = self.__execute(data["language"])
+            # --------------------------------------------------------------------------
+            # Encode the output to base64
+            stdout = base64.b64encode(stdout.encode('utf-8')).decode()
+            stderr = base64.b64encode(stderr.encode('utf-8')).decode()
+            # --------------------------------------------------------------------------
+            # Append the output to the submission
             submission["stderr"].append(stderr)
             submission["stdout"].append(stdout)
         submission["status"] = "done execution"

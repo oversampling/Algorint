@@ -247,11 +247,13 @@ app.post("/api/posts/assignment/submit", isLoggedIn, async (req: Request, res: R
     if (!assignment) return res.status(404).json({message: "Assignment not found"})
     const stdin: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdin)
     const stdout: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdout)
+    const replace: {from: string, to: string}[] = assignment.test_cases.map((test_case: any)=> test_case.replace)
     const response = await axios.post("http://localhost/make_submission", {
         code,
         language,
         test_cases: stdout,
-        input: stdin
+        input: stdin,
+        replace: replace
     })
     return res.json({submission_token: response.data})
 })

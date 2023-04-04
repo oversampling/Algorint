@@ -108,6 +108,7 @@ def make_submission():
         "code": <str>,
         "input": [<str>],
         "test_cases" [<str>]
+        "replace": [{"from": <str>, "to": <str>}]
     }
     """
     # Retrieve submission data
@@ -116,6 +117,7 @@ def make_submission():
     code = data["code"]
     input = data["input"]
     test_cases = data["test_cases"]
+    replace = data["replace"]
     # Save to submission database
     submission_id = str(uuid.uuid4())
     submission = {
@@ -128,16 +130,16 @@ def make_submission():
         return jsonify({"error": "language is required"}), 400
     if (language in ["python", "nodejs"]):
         cee_intrepreter_submission(
-            language, code, input, test_cases, submission_id)
+            language, code, input, test_cases, submission_id, replace)
     elif (language in ["c", "cpp", "rust"]):
         cee_compiler_submission(
-            language, code, input, test_cases, submission_id)
+            language, code, input, test_cases, submission_id, replace)
     else:
         return jsonify({"error": "language not supported"}), 400
     return submission_id
 
 
-def cee_intrepreter_submission(language, code, input, test_cases, submission_id):
+def cee_intrepreter_submission(language, code, input, test_cases, submission_id, replace):
     """
     language: str
     code: str
@@ -147,11 +149,11 @@ def cee_intrepreter_submission(language, code, input, test_cases, submission_id)
     cee_interpreter_queue_name = os.getenv(
         "CEE_INTERPRETER_QUEUE_NAME").strip()
     message = {"language": language, "code": code,
-               "input": input, "test_cases": test_cases, "submission_id": submission_id}
+               "input": input, "test_cases": test_cases, "submission_id": submission_id, "replace": replace}
     enqueue_submission(message, cee_interpreter_queue_name)
 
 
-def cee_compiler_submission(language, code, input, test_cases, submission_id):
+def cee_compiler_submission(language, code, input, test_cases, submission_id, replace):
     """
     language: str
     code: str
@@ -160,7 +162,7 @@ def cee_compiler_submission(language, code, input, test_cases, submission_id):
     """
     cee_compiler_queue_name = os.getenv("CEE_COMPILER_QUEUE_NAME").strip()
     message = {"language": language, "code": code,
-               "input": input, "test_cases": test_cases, "submission_id": submission_id}
+               "input": input, "test_cases": test_cases, "submission_id": submission_id, "replace": replace}
     enqueue_submission(message, cee_compiler_queue_name)
 
 
