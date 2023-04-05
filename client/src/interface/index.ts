@@ -62,3 +62,9 @@ export interface IAssignment_Code_Execution extends ICode_Execution_Body {
 export interface IAssignment_Code_Submission extends IAssignment_Code_Execution {
     assignment_id: string;
 }
+
+export interface ISubmission_Result {
+    stderr: string;
+    stdout: string;
+    result: boolean;
+}
