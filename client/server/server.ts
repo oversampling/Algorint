@@ -230,7 +230,8 @@ app.post("/api/posts/assignment/execute", isLoggedIn, async (req: Request, res: 
         code,
         language,
         test_cases: [""],
-        input: [""]
+        input: [""],
+        replace: [{from: "", to: ""}]
     })
     res.json({submission_token: response.data})
 })

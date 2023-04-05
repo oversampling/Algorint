@@ -90,9 +90,9 @@ export default function Posts() {
                 ) as HTMLInputElement;
                 if (textarea != null) {
                     if (response.stdout[0] != "") {
-                        textarea.value = response.stdout[0];
+                        textarea.value = atob(response.stdout[0]);
                     } else {
-                        textarea.value = response.stderr[0];
+                        textarea.value = atob(response.stderr[0]);
                     }
                 }
                 break;
@@ -145,10 +145,11 @@ export default function Posts() {
             execution_button && (execution_button.disabled = true);
             submit_button && (submit_button.disabled = true);
             const body: ICode_Execution_Body = {
-                code,
+                code: btoa(code),
                 language,
             };
             const data = await executeCode(body).unwrap();
+            console.log(data, body);
             const submission_token = data.submission_token;
             await fetchExecutionResultLoop(3, submission_token, 2000, index);
             execution_button && (execution_button.disabled = false);
@@ -176,7 +177,7 @@ export default function Posts() {
                     execution_result && (execution_result.disabled = true);
                     execution_button && (execution_button.disabled = true);
                     const submission: IAssignment_Code_Submission = {
-                        code,
+                        code: btoa(code),
                         language,
                         assignment_id: data.assignments[index]._id || "",
                         index,
