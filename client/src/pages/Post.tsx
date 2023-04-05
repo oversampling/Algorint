@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { Button, Card, FloatingLabel, Form, Stack } from "react-bootstrap";
+import {
+    Button,
+    Card,
+    FloatingLabel,
+    Form,
+    OverlayTrigger,
+    Popover,
+    Stack,
+} from "react-bootstrap";
 import { Link, useParams } from "react-router-dom";
 import Code from "../component/Editor/Code";
 import Header from "../component/Header";
@@ -14,6 +22,7 @@ import {
     IAssignment_Code_Execution,
     IAssignment_Code_Submission,
     ICode_Execution_Body,
+    ISubmission_Result,
     Post,
 } from "../interface";
 
@@ -24,6 +33,9 @@ export default function Posts() {
     const [assignmentCode, setassignmentCode] = useState<
         IAssignment_Code_Execution[] | undefined
     >();
+    const [submissionResult, setSubmissionResult] = useState<
+        ISubmission_Result[]
+    >([]);
     const [executeCode, { isLoading: execution_status }] =
         useExecuteCodeMutation();
     const [fetchExecutionResult, { isLoading: execution_result }] =
@@ -79,6 +91,7 @@ export default function Posts() {
         ms: number,
         index: number
     ) {
+        setSubmissionResult([]);
         for (let i = 0; i < max_retries; i++) {
             const response = await fetchExecutionResultWithSleep(
                 submission_token,
@@ -90,9 +103,9 @@ export default function Posts() {
                 ) as HTMLInputElement;
                 if (textarea != null) {
                     if (response.stdout[0] != "") {
-                        textarea.value = atob(response.stdout[0]);
+                        textarea.innerText = atob(response.stdout[0]);
                     } else {
-                        textarea.value = atob(response.stderr[0]);
+                        textarea.innerText = atob(response.stderr[0]);
                     }
                 }
                 break;
@@ -105,6 +118,7 @@ export default function Posts() {
         ms: number,
         index: number
     ) {
+        setSubmissionResult([]);
         for (let i = 0; i < max_retries; i++) {
             const response = await fetchExecutionResultWithSleep(
                 submission_token,
@@ -114,14 +128,21 @@ export default function Posts() {
                 const textarea = document.getElementById(
                     `execution-result-${index}`
                 ) as HTMLInputElement;
+                const subResultArray: ISubmission_Result[] = [];
                 if (textarea != null) {
                     let result: string = "";
                     for (let i = 0; i < response.stdout.length; i++) {
                         result += `Test Case ${i + 1} : ${
                             response.result[i] ? "Passed" : "Failed"
                         }\n`;
+                        const subResult: ISubmission_Result = {
+                            stderr: atob(response.stderr[i]),
+                            stdout: atob(response.stdout[i]),
+                            result: response.result[i],
+                        };
+                        subResultArray.push(subResult);
                     }
-                    textarea.value = result;
+                    setSubmissionResult(subResultArray);
                 }
                 break;
             }
@@ -149,7 +170,6 @@ export default function Posts() {
                 language,
             };
             const data = await executeCode(body).unwrap();
-            console.log(data, body);
             const submission_token = data.submission_token;
             await fetchExecutionResultLoop(3, submission_token, 2000, index);
             execution_button && (execution_button.disabled = false);
@@ -158,7 +178,6 @@ export default function Posts() {
         }
     }
     async function handle_submit(assignmentIndex: number) {
-        console.log(assignmentIndex);
         if (assignmentCode) {
             const { code, language, index }: IAssignment_Code_Execution =
                 assignmentCode[assignmentIndex];
@@ -176,6 +195,7 @@ export default function Posts() {
                     execution_result && (execution_result.value = "");
                     execution_result && (execution_result.disabled = true);
                     execution_button && (execution_button.disabled = true);
+                    submit_button && (submit_button.disabled = true);
                     const submission: IAssignment_Code_Submission = {
                         code: btoa(code),
                         language,
@@ -186,7 +206,7 @@ export default function Posts() {
                     const submission_token: string = response.submission_token;
                     console.log(submission_token);
                     await fetchSubmissionResultLoop(
-                        3,
+                        10,
                         submission_token,
                         2000,
                         index
@@ -325,20 +345,75 @@ export default function Posts() {
                                                                 </Card.Body>
                                                             </Card>
                                                         </div>
-                                                        <FloatingLabel
-                                                            controlId={`execution-result-${index}`}
-                                                            label=""
-                                                            className="mb-3"
+                                                        <div
+                                                            className="shadow-none p-3 mb-5 bg-light rounded"
+                                                            style={{
+                                                                minHeight:
+                                                                    "20px",
+                                                                maxHeight:
+                                                                    "100%",
+                                                            }}
+                                                            id={`execution-result-${index}`}
                                                         >
-                                                            <Form.Control
-                                                                as="textarea"
-                                                                placeholder="Execution Result"
-                                                                style={{
-                                                                    height: "100px",
-                                                                }}
-                                                                className="shadow-sm bg-body rounded border-0"
-                                                            />
-                                                        </FloatingLabel>
+                                                            {submissionResult.length !==
+                                                            0
+                                                                ? submissionResult.map(
+                                                                      (
+                                                                          result,
+                                                                          index
+                                                                      ) => {
+                                                                          return (
+                                                                              <OverlayTrigger
+                                                                                  trigger="click"
+                                                                                  key={
+                                                                                      index
+                                                                                  }
+                                                                                  placement="top"
+                                                                                  overlay={
+                                                                                      <Popover
+                                                                                          id={`popover-positioned-${index}`}
+                                                                                      >
+                                                                                          <Popover.Header as="h3">
+                                                                                              Test
+                                                                                              Case{" "}
+                                                                                              {index +
+                                                                                                  1}
+                                                                                          </Popover.Header>
+                                                                                          <Popover.Body>
+                                                                                              <div>
+                                                                                                  <strong>
+                                                                                                      {result.result
+                                                                                                          ? "STDOUT"
+                                                                                                          : "STDERR"}
+                                                                                                  </strong>
+                                                                                              </div>
+                                                                                              <div>
+                                                                                                  {result.result
+                                                                                                      ? result.stdout
+                                                                                                      : result.stderr}
+                                                                                              </div>
+                                                                                          </Popover.Body>
+                                                                                      </Popover>
+                                                                                  }
+                                                                              >
+                                                                                  <Button
+                                                                                      className="mx-1"
+                                                                                      variant={
+                                                                                          result.result
+                                                                                              ? "success"
+                                                                                              : "danger"
+                                                                                      }
+                                                                                  >
+                                                                                      {result.result
+                                                                                          ? "PASS"
+                                                                                          : "FAIL"}
+                                                                                  </Button>
+                                                                              </OverlayTrigger>
+                                                                          );
+                                                                      }
+                                                                  )
+                                                                : ""}
+                                                        </div>
                                                         <Stack
                                                             direction="horizontal"
                                                             gap={1}
