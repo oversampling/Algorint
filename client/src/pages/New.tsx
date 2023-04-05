@@ -12,7 +12,7 @@ import Code from "../component/Editor/Code";
 import Markdown from "../component/Editor/Markdown";
 import Header from "../component/Header";
 import { useNavigate } from "react-router-dom";
-import { Assignment, Post } from "../interface";
+import { Assignment, Post, Test_Case } from "../interface";
 import { useAddNewPostMutation } from "../features/posts/postsApiSlice";
 
 export default function New() {
@@ -130,6 +130,16 @@ export default function New() {
                 }
                 if (post.assignments[i].language === undefined) {
                     post.assignments[i].language = "python";
+                    return;
+                }
+                if (post.assignments[i].test_cases === undefined) {
+                    post.assignments[i].test_cases = [
+                        {
+                            stdin: "",
+                            stdout: "",
+                            replace: { from: "", to: "" },
+                        },
+                    ];
                     return;
                 }
             }

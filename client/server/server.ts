@@ -284,6 +284,22 @@ app.delete("/api/posts", isLoggedIn, async (req: Request, res: Response, next: N
                 user.posts.splice(userPosts.indexOf(req.body.post_id), 1)
                 await user.save();
             }
+            // Delete Test Case and Assignment inside Post
+            const post = await Post.findById(req.body.post_id).populate("assignments");
+            if (post){
+                console.log(post)
+                for (const assignment of post.assignments){
+                    const foundAssignment = await Assignment.findById(assignment._id).populate("test_cases");
+                    if (foundAssignment){
+                        console.log(foundAssignment)
+                        for (const test_case of foundAssignment.test_cases){
+                            await TestCase.findByIdAndDelete(test_case._id);
+                        }
+                        await Assignment.findByIdAndDelete(foundAssignment._id);
+                    }
+                }
+                await Post.findByIdAndDelete(post._id);
+            }
         }else {
             return res.status(400).json({message: "User not found"})
         }
