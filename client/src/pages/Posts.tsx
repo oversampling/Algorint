@@ -21,7 +21,7 @@ export default function Posts({ posts }: { posts?: Post[] }) {
                             id="uncontrolled-tab-example"
                             className="mb-3"
                         >
-                            <Tab eventKey="Posts" title="Posts">
+                            <Tab eventKey="Posts" title="Tutorial">
                                 {isLoading ? (
                                     <div
                                         className="spinner-border text-primary position-absolute top-50 start-50"

@@ -10,6 +10,8 @@ RUN npm install
 
 COPY . ./
 
+RUN echo "export const env = { SERVER_URL: '',}" > env.ts
+
 RUN npm run build
 
 #Stage 2

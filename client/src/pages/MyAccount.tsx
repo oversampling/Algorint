@@ -27,7 +27,7 @@ export default function MyAccount() {
                             id="uncontrolled-tab-example"
                             className="mb-3"
                         >
-                            <Tab eventKey="Posts" title="My Posts">
+                            <Tab eventKey="Posts" title="My Tutorial">
                                 {posts && (
                                     <PostList
                                         posts={posts}

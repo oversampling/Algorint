@@ -90,7 +90,7 @@ export default function Posts() {
         submission_token: string,
         ms: number,
         index: number
-    ) {
+    ): Promise<number> {
         setSubmissionResult([]);
         for (let i = 0; i < max_retries; i++) {
             const response = await fetchExecutionResultWithSleep(
@@ -108,16 +108,17 @@ export default function Posts() {
                         textarea.innerText = atob(response.stderr[0]);
                     }
                 }
-                break;
+                return 0;
             }
         }
+        return -1;
     }
     async function fetchSubmissionResultLoop(
         max_retries: number,
         submission_token: string,
         ms: number,
         index: number
-    ) {
+    ): Promise<number> {
         setSubmissionResult([]);
         for (let i = 0; i < max_retries; i++) {
             const response = await fetchExecutionResultWithSleep(
@@ -144,9 +145,10 @@ export default function Posts() {
                     }
                     setSubmissionResult(subResultArray);
                 }
-                break;
+                return 0;
             }
         }
+        return -1;
     }
     async function handle_execution(assignmentIndex: number) {
         if (assignmentCode) {
@@ -171,7 +173,7 @@ export default function Posts() {
             };
             const data = await executeCode(body).unwrap();
             const submission_token = data.submission_token;
-            await fetchExecutionResultLoop(3, submission_token, 2000, index);
+            await fetchExecutionResultLoop(20, submission_token, 2000, index);
             execution_button && (execution_button.disabled = false);
             execution_result && (execution_result.disabled = false);
             submit_button && (submit_button.disabled = false);
@@ -206,7 +208,7 @@ export default function Posts() {
                     const submission_token: string = response.submission_token;
                     console.log(submission_token);
                     await fetchSubmissionResultLoop(
-                        10,
+                        20,
                         submission_token,
                         2000,
                         index
