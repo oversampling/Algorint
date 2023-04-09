@@ -13,10 +13,10 @@ export interface INewPost {
                     _id?: string,
                     stdin: string,
                     stdout: string,
-                    replace: {
+                    replace: [{
                         from: string,
                         to: string,
-                    }
+                    }]
                 }
             ]
         }

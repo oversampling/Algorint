@@ -5,18 +5,21 @@ const Schema = mongoose.Schema;
 export interface ITestCase {
     stdin: string,
     stdout: string,
-    replace: {
+    replace: [{
         from: string,
         to: string,
-    }
+    }]
 }
 
 const TestCaseSchema = new Schema<ITestCase>({
     stdin: String,
     stdout: String,
     replace: {
-        from: String,
-        to: String,
+        type: [{
+            from: String,
+            to: String,
+        }],
+        default: []
     }
 });
 

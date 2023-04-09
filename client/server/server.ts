@@ -204,7 +204,7 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
                         const newTestCase = new TestCase({
                             stdin: test_case.stdin,
                             stdout: test_case.stdout,
-                            replace: test_case.replace ? test_case.replace : {from: "", to: ""}
+                            replace: test_case.replace ? test_case.replace : [{from: "", to: ""}]
                         });
                         await newTestCase.save();
                         newAssignment.test_cases.push(newTestCase._id);
@@ -248,7 +248,7 @@ app.post("/api/posts/assignment/submit", isLoggedIn, async (req: Request, res: R
     if (!assignment) return res.status(404).json({message: "Assignment not found"})
     const stdin: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdin)
     const stdout: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdout)
-    const replace: {from: string, to: string}[] = assignment.test_cases.map((test_case: any)=> test_case.replace)
+    const replace: {from: string, to: string}[][] = assignment.test_cases.map((test_case: any)=> test_case.replace)
     const response = await axios.post("http://localhost/make_submission", {
         code,
         language,
@@ -287,11 +287,9 @@ app.delete("/api/posts", isLoggedIn, async (req: Request, res: Response, next: N
             // Delete Test Case and Assignment inside Post
             const post = await Post.findById(req.body.post_id).populate("assignments");
             if (post){
-                console.log(post)
                 for (const assignment of post.assignments){
                     const foundAssignment = await Assignment.findById(assignment._id).populate("test_cases");
                     if (foundAssignment){
-                        console.log(foundAssignment)
                         for (const test_case of foundAssignment.test_cases){
                             await TestCase.findByIdAndDelete(test_case._id);
                         }
@@ -369,14 +367,14 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                     if (testCaseToUpdate){
                                         testCaseToUpdate.stdin = test_case.stdin;
                                         testCaseToUpdate.stdout = test_case.stdout;
-                                        testCaseToUpdate.replace = test_case.replace ? test_case.replace : {from: "", to: ""};
+                                        testCaseToUpdate.replace = test_case.replace;
                                         await testCaseToUpdate.save();
                                     }
                                 }else{
                                     const newTestCase = new TestCase({
                                         stdin: test_case.stdin,
                                         stdout: test_case.stdout,
-                                        replace: test_case.replace ? test_case.replace : {from: "", to: ""},
+                                        replace: test_case.replace ? test_case.replace : [{from: "", to: ""}],
                                     });
                                     await newTestCase.save();
                                     newAssignment.test_cases.push(newTestCase._id);
