@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import Header from "../component/Header";
 import {
     Button,
     Card,
@@ -9,17 +9,91 @@ import {
     Stack,
 } from "react-bootstrap";
 import Code from "../component/Editor/Code";
-import Markdown from "../component/Editor/Markdown";
-import Header from "../component/Header";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Assignment, Post, Test_Case } from "../interface";
-import { useAddNewPostMutation } from "../features/posts/postsApiSlice";
+import {
+    useUpdateAccountPostMutation,
+    useViewPostQuery,
+} from "../features/posts/postsApiSlice";
+import Markdown from "../component/Editor/Markdown";
+import { useEffect, useState } from "react";
 
-export default function New() {
+export default function EditPost() {
+    const { id } = useParams<{ id: string }>();
     const [post, setPost] = useState<Post>({} as Post);
     const [assingmentList, setAssignmentList] = useState<Assignment[]>([]);
-    const [addNewPost, { isLoading }] = useAddNewPostMutation();
     const navigate = useNavigate();
+    const { data, isLoading }: { data?: any; isLoading: boolean } =
+        useViewPostQuery(id || "");
+    const [updateAccountPost] = useUpdateAccountPostMutation();
+    useEffect(() => {
+        const newData = { ...data };
+        if (newData) {
+            const assignmentList: Assignment[] = [];
+            if (newData.assignments !== undefined) {
+                for (let i = 0; i < newData.assignments.length; i++) {
+                    const testCases: Test_Case[] = [];
+                    for (
+                        let j = 0;
+                        j < newData.assignments[i].test_cases.length;
+                        j++
+                    ) {
+                        const replace: { from: string; to: string }[] = [];
+                        for (
+                            let k = 0;
+                            k <
+                            newData.assignments[i].test_cases[j].replace.length;
+                            k++
+                        ) {
+                            const obj = {
+                                from: atob(
+                                    newData.assignments[i].test_cases[j]
+                                        .replace[k][0].from
+                                ),
+                                to: atob(
+                                    newData.assignments[i].test_cases[j]
+                                        .replace[k][0].to
+                                ),
+                            };
+                            replace.push(obj);
+                        }
+                        const testCase: Test_Case = {
+                            _id: newData.assignments[i].test_cases[j]._id,
+                            replace: replace,
+                            stdin: atob(
+                                newData.assignments[i].test_cases[j].stdin
+                            ),
+                            stdout: atob(
+                                newData.assignments[i].test_cases[j].stdout
+                            ),
+                        };
+                        testCases.push(testCase);
+                    }
+                    const assignment: Assignment = {
+                        _id: newData.assignments[i]._id,
+                        question: atob(newData.assignments[i].question),
+                        code_template: atob(
+                            newData.assignments[i].code_template
+                        ),
+                        language: newData.assignments[i].language,
+                        test_cases: testCases,
+                    };
+                    assignmentList.push(assignment);
+                }
+            }
+            const post: Post = {
+                _id: newData._id,
+                title: atob(newData.title || ""),
+                description: atob(newData.description || ""),
+                isPublic: newData.isPublic || false,
+                assignments: newData.assignments || [],
+            };
+            setPost(post);
+            setAssignmentList(assignmentList);
+        } else {
+            navigate("/404");
+        }
+    }, [isLoading]);
     function handlePostChange(e: React.ChangeEvent<HTMLInputElement>) {
         const { name, value } = e.target;
         if (name === "isPublic") {
@@ -127,19 +201,18 @@ export default function New() {
             1
         );
         setAssignmentList(list);
-        console.log(assingmentList[assignment_index]["test_cases"][testIndex]);
         setPost({ ...post, assignments: list });
     }
-    async function savePost(e: React.FormEvent<HTMLFormElement>) {
+    async function updatePost(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
-        if (post.title === undefined) {
+        if (post.title === undefined || post.title === "") {
             alert("Title is required");
             return;
         }
         if (post.isPublic === undefined) {
             post["isPublic"] = false;
         }
-        if (post.description === undefined) {
+        if (post.description === undefined || post.description === "") {
             alert("Description is required");
             return;
         }
@@ -172,22 +245,33 @@ export default function New() {
             }
         }
         // Encode data to base64
-        post.description = btoa(post.description);
-        post.title = btoa(post.title);
-        for (let i = 0; i < post.assignments.length; i++) {
-            post.assignments[i].question = btoa(post.assignments[i].question);
-            post.assignments[i].code_template = btoa(
-                post.assignments[i].code_template
+        const postToUpdate: Post = { ...post };
+        postToUpdate.description = btoa(post.description);
+        postToUpdate.title = btoa(post.title);
+        const assingmentListToUpdate: Assignment[] = [...assingmentList];
+        for (let i = 0; i < assingmentListToUpdate.length; i++) {
+            assingmentListToUpdate[i].question = btoa(
+                assingmentListToUpdate[i].question
             );
-            for (let j = 0; j < post.assignments[i].test_cases.length; j++) {
-                post.assignments[i].test_cases[j].stdin = btoa(
-                    post.assignments[i].test_cases[j].stdin
+            assingmentListToUpdate[i].code_template = btoa(
+                assingmentListToUpdate[i].code_template
+            );
+            for (
+                let j = 0;
+                j < assingmentListToUpdate[i].test_cases.length;
+                j++
+            ) {
+                assingmentListToUpdate[i].test_cases[j].stdin = btoa(
+                    assingmentListToUpdate[i].test_cases[j].stdin
                 );
-                post.assignments[i].test_cases[j].stdout = btoa(
-                    post.assignments[i].test_cases[j].stdout
+                assingmentListToUpdate[i].test_cases[j].stdout = btoa(
+                    assingmentListToUpdate[i].test_cases[j].stdout
                 );
-                if (post.assignments[i].test_cases[j].replace === undefined) {
-                    post.assignments[i].test_cases[j].replace = [
+                if (
+                    assingmentListToUpdate[i].test_cases[j].replace ===
+                    undefined
+                ) {
+                    assingmentListToUpdate[i].test_cases[j].replace = [
                         {
                             from: "",
                             to: "",
@@ -196,45 +280,55 @@ export default function New() {
                 } else {
                     for (
                         let k = 0;
-                        k < post.assignments[i].test_cases[j].replace.length;
+                        k <
+                        assingmentListToUpdate[i].test_cases[j].replace.length;
                         k++
                     ) {
                         if (
-                            post.assignments[i].test_cases[j].replace[k] ===
-                            undefined
+                            assingmentListToUpdate[i].test_cases[j].replace[
+                                k
+                            ] === undefined
                         ) {
-                            post.assignments[i].test_cases[j].replace[k] = {
-                                from: "",
-                                to: "",
-                            };
+                            assingmentListToUpdate[i].test_cases[j].replace[k] =
+                                {
+                                    from: "",
+                                    to: "",
+                                };
                         }
                         if (
-                            post.assignments[i].test_cases[j].replace[k]
+                            assingmentListToUpdate[i].test_cases[j].replace[k]
                                 .from === undefined
                         ) {
-                            post.assignments[i].test_cases[j].replace[k].from =
-                                "";
+                            assingmentListToUpdate[i].test_cases[j].replace[
+                                k
+                            ].from = "";
                         }
                         if (
-                            post.assignments[i].test_cases[j].replace[k].to ===
-                            undefined
+                            assingmentListToUpdate[i].test_cases[j].replace[k]
+                                .to === undefined
                         ) {
-                            post.assignments[i].test_cases[j].replace[k].to =
-                                "";
+                            assingmentListToUpdate[i].test_cases[j].replace[
+                                k
+                            ].to = "";
                         }
-                        post.assignments[i].test_cases[j].replace[k].from =
-                            btoa(
-                                post.assignments[i].test_cases[j].replace[k]
-                                    .from
-                            );
-                        post.assignments[i].test_cases[j].replace[k].to = btoa(
-                            post.assignments[i].test_cases[j].replace[k].to
+                        assingmentListToUpdate[i].test_cases[j].replace[
+                            k
+                        ].from = btoa(
+                            assingmentListToUpdate[i].test_cases[j].replace[k]
+                                .from
                         );
+                        assingmentListToUpdate[i].test_cases[j].replace[k].to =
+                            btoa(
+                                assingmentListToUpdate[i].test_cases[j].replace[
+                                    k
+                                ].to
+                            );
                     }
                 }
             }
         }
-        const data = await addNewPost(post).unwrap();
+        postToUpdate.assignments = assingmentListToUpdate;
+        const data = await updateAccountPost(postToUpdate).unwrap();
         navigate(`/posts/${data._id}`);
     }
     return (
@@ -243,7 +337,7 @@ export default function New() {
             <div className="container mt-3">
                 <div className="row justify-content-center">
                     <div className="col-8">
-                        <Form onSubmit={savePost}>
+                        <Form onSubmit={updatePost}>
                             <Card className="shadow-sm bg-body rounded border-0 mb-2">
                                 <Card.Header>
                                     <Stack direction="horizontal" gap={3}>
@@ -254,6 +348,9 @@ export default function New() {
                                             id="isPublic"
                                             name="isPublic"
                                             label={`Private`}
+                                            defaultChecked={
+                                                post.isPublic ? true : false
+                                            }
                                             onChange={handlePostChange}
                                         />
                                     </Stack>
@@ -267,6 +364,7 @@ export default function New() {
                                             required
                                             name="title"
                                             onChange={handlePostChange}
+                                            value={post.title || ""}
                                             placeholder="Enter Tutorial Title"
                                         />
                                     </Form.Group>
@@ -276,6 +374,7 @@ export default function New() {
                                             onChange={
                                                 handlePostDescriptionChange
                                             }
+                                            value={post.description || ""}
                                         />
                                     </Form.Group>
                                     {assingmentList?.map(
@@ -296,6 +395,10 @@ export default function New() {
                                                             </Form.Label>
                                                             <Markdown
                                                                 index={index}
+                                                                value={
+                                                                    assignment.question.trim() ||
+                                                                    ""
+                                                                }
                                                                 onChange={
                                                                     handleAssignmentQuestionChange
                                                                 }
@@ -495,6 +598,11 @@ export default function New() {
                                                                                     as="textarea"
                                                                                     placeholder="Leave a comment here"
                                                                                     name="stdin"
+                                                                                    value={
+                                                                                        test[
+                                                                                            "stdin"
+                                                                                        ]
+                                                                                    }
                                                                                     onChange={(
                                                                                         e
                                                                                     ) => {
@@ -518,6 +626,11 @@ export default function New() {
                                                                                     as="textarea"
                                                                                     placeholder="Leave a comment here"
                                                                                     name="stdout"
+                                                                                    value={
+                                                                                        test[
+                                                                                            "stdout"
+                                                                                        ]
+                                                                                    }
                                                                                     onChange={(
                                                                                         e
                                                                                     ) => {
@@ -566,7 +679,7 @@ export default function New() {
                                     type="submit"
                                     className="ms-auto"
                                 >
-                                    Save Tutorial
+                                    Update Tutorial
                                 </Button>
                             </Stack>
                         </Form>

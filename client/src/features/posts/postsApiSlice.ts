@@ -55,11 +55,18 @@ export const postsApiSlice = apiSlice.injectEndpoints({
                 method: 'DELETE',
                 body: {post_id: post_id}
             })
-        })
+        }),
+        updateAccountPost: builder.mutation({
+            query: (body: Post) => ({
+                url: `/api/posts`,
+                method: 'PUT',
+                body: body
+            })
+        }),
     })
 })
 
 export const {
     useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation, useSubmitCodeMutation, useFetchAccountPostsMutation,
-    useDeleteAccountPostMutation
+    useDeleteAccountPostMutation, useUpdateAccountPostMutation
 } = postsApiSlice

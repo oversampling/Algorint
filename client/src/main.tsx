@@ -15,6 +15,7 @@ import RequireAuth from "./features/auth/RequireAuth";
 import { Provider } from "react-redux";
 import { store } from "./app/store";
 import MyAccount from "./pages/MyAccount";
+import EditPost from "./pages/EditPost";
 
 const router = createBrowserRouter([
     {
@@ -37,6 +38,10 @@ const router = createBrowserRouter([
             {
                 path: "search",
                 element: <SearchPosts />,
+            },
+            {
+                path: "edit/:id",
+                element: <EditPost />,
             },
         ],
     },

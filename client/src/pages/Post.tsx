@@ -285,8 +285,11 @@ export default function Posts() {
                                                     <Card.Body>
                                                         <div className="mb-3">
                                                             <Form.Label>
-                                                                Assignment
-                                                                Question
+                                                                <strong>
+                                                                    {" "}
+                                                                    Assignment
+                                                                    Question
+                                                                </strong>
                                                             </Form.Label>
                                                             <MarkdownPreview
                                                                 value={atob(
@@ -298,7 +301,9 @@ export default function Posts() {
                                                         </div>
                                                         <div className="mb-3">
                                                             <Form.Label>
-                                                                Your Answer
+                                                                <strong>
+                                                                    Your Answer
+                                                                </strong>
                                                             </Form.Label>
                                                             <Card className="shadow-sm bg-body rounded border-0">
                                                                 <Card.Header>

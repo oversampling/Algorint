@@ -314,13 +314,13 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
         const user = await User.findOne({googleId: decoded_jwt.sub});
         if (user){
             const userPosts = user.posts;
-            if (userPosts.includes(new mongoose.Types.ObjectId(req.body._id))){
-                const post = await Post.findById(req.body._id)
+            if (userPosts.includes(new mongoose.Types.ObjectId(postBody._id))){
+                const post = await Post.findById(postBody._id)
                 // Update Post
                 if (post){
-                    post.title = req.body.title;
-                    post.description = req.body.description;
-                    post.isPublic = req.body.isPublic;
+                    post.title = postBody.title;
+                    post.description = postBody.description;
+                    post.isPublic = postBody.isPublic;
                     await post.save();
                     // Update Post Assignment
                     for (const assignment of postBody.assignments) {
@@ -337,13 +337,13 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                     if (testCaseToUpdate){
                                         testCaseToUpdate.stdin = test_case.stdin;
                                         testCaseToUpdate.stdout = test_case.stdout;
-                                        testCaseToUpdate.replace = test_case.replace;
+                                        testCaseToUpdate.replace = test_case.replace || [{from: "", to: ""}];
                                         await testCaseToUpdate.save();
                                     }else{
                                         const newTestCase = new TestCase({
                                             stdin: test_case.stdin,
                                             stdout: test_case.stdout,
-                                            replace: test_case.replace,
+                                            replace: test_case.replace || [{from: "", to: ""}]
                                         });
                                         await newTestCase.save();
                                         assingmentToUpdate.test_cases.push(newTestCase._id);
@@ -386,10 +386,10 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                 }
             }
         }else {
-            return res.status(400).json({message: "User not found"})
+            return res.status(400).json({id: "User not found"})
         }
     }
-    return res.status(200).json({message: "Post updated"})
+    return res.status(200).json({_id: postBody._id})
 })
 
 app.all("*", (req: Request, res:Response, next: NextFunction) => {
