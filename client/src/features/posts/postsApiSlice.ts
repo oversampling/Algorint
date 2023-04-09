@@ -63,10 +63,16 @@ export const postsApiSlice = apiSlice.injectEndpoints({
                 body: body
             })
         }),
+        viewPostUpdate: builder.mutation({
+            query: (id: string) => ({
+                url: `/api/posts/${id}`,
+                method: 'GET'
+            })
+        })
     })
 })
 
 export const {
     useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation, useSubmitCodeMutation, useFetchAccountPostsMutation,
-    useDeleteAccountPostMutation, useUpdateAccountPostMutation
+    useDeleteAccountPostMutation, useUpdateAccountPostMutation, useViewPostUpdateMutation
 } = postsApiSlice

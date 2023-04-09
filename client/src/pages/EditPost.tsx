@@ -13,7 +13,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Assignment, Post, Test_Case } from "../interface";
 import {
     useUpdateAccountPostMutation,
-    useViewPostQuery,
+    useViewPostUpdateMutation,
 } from "../features/posts/postsApiSlice";
 import Markdown from "../component/Editor/Markdown";
 import { useEffect, useState } from "react";
@@ -23,77 +23,87 @@ export default function EditPost() {
     const [post, setPost] = useState<Post>({} as Post);
     const [assingmentList, setAssignmentList] = useState<Assignment[]>([]);
     const navigate = useNavigate();
-    const { data, isLoading }: { data?: any; isLoading: boolean } =
-        useViewPostQuery(id || "");
+    const [viewPostUpdate, { isLoading, data }] = useViewPostUpdateMutation();
     const [updateAccountPost] = useUpdateAccountPostMutation();
     useEffect(() => {
-        const newData = { ...data };
-        if (newData) {
-            const assignmentList: Assignment[] = [];
-            if (newData.assignments !== undefined) {
-                for (let i = 0; i < newData.assignments.length; i++) {
-                    const testCases: Test_Case[] = [];
-                    for (
-                        let j = 0;
-                        j < newData.assignments[i].test_cases.length;
-                        j++
-                    ) {
-                        const replace: { from: string; to: string }[] = [];
+        async function fetchPost() {
+            const data = await viewPostUpdate(id || "").unwrap();
+            console.log(data);
+            const newData = { ...data };
+            if (newData) {
+                const assignmentList: Assignment[] = [];
+                if (newData.assignments !== undefined) {
+                    for (let i = 0; i < newData.assignments.length; i++) {
+                        const testCases: Test_Case[] = [];
                         for (
-                            let k = 0;
-                            k <
-                            newData.assignments[i].test_cases[j].replace.length;
-                            k++
+                            let j = 0;
+                            j < newData.assignments[i].test_cases.length;
+                            j++
                         ) {
-                            const obj = {
-                                from: atob(
+                            const replace: { from: string; to: string }[] = [];
+                            for (
+                                let k = 0;
+                                k <
+                                newData.assignments[i].test_cases[j].replace
+                                    .length;
+                                k++
+                            ) {
+                                if (
                                     newData.assignments[i].test_cases[j]
-                                        .replace[k][0].from
+                                        .replace[k] !== undefined
+                                ) {
+                                    const obj = {
+                                        from: atob(
+                                            newData.assignments[i].test_cases[j]
+                                                .replace[k].from
+                                        ),
+                                        to: atob(
+                                            newData.assignments[i].test_cases[j]
+                                                .replace[k].to
+                                        ),
+                                    };
+                                    replace.push(obj);
+                                }
+                            }
+                            const testCase: Test_Case = {
+                                _id: newData.assignments[i].test_cases[j]._id,
+                                replace: replace,
+                                stdin: atob(
+                                    newData.assignments[i].test_cases[j].stdin
                                 ),
-                                to: atob(
-                                    newData.assignments[i].test_cases[j]
-                                        .replace[k][0].to
+                                stdout: atob(
+                                    newData.assignments[i].test_cases[j].stdout
                                 ),
                             };
-                            replace.push(obj);
+                            testCases.push(testCase);
                         }
-                        const testCase: Test_Case = {
-                            _id: newData.assignments[i].test_cases[j]._id,
-                            replace: replace,
-                            stdin: atob(
-                                newData.assignments[i].test_cases[j].stdin
+                        const assignment: Assignment = {
+                            _id: newData.assignments[i]._id,
+                            question: atob(newData.assignments[i].question),
+                            code_template: atob(
+                                newData.assignments[i].code_template
                             ),
-                            stdout: atob(
-                                newData.assignments[i].test_cases[j].stdout
-                            ),
+                            language: newData.assignments[i].language,
+                            test_cases: testCases,
                         };
-                        testCases.push(testCase);
+                        assignmentList.push(assignment);
                     }
-                    const assignment: Assignment = {
-                        _id: newData.assignments[i]._id,
-                        question: atob(newData.assignments[i].question),
-                        code_template: atob(
-                            newData.assignments[i].code_template
-                        ),
-                        language: newData.assignments[i].language,
-                        test_cases: testCases,
-                    };
-                    assignmentList.push(assignment);
                 }
+                const post: Post = {
+                    _id: newData._id,
+                    title: atob(newData.title || ""),
+                    description: atob(newData.description || ""),
+                    isPublic: newData.isPublic || false,
+                    assignments: newData.assignments || [],
+                };
+                setPost(post);
+                setAssignmentList(assignmentList);
+            } else {
+                navigate("/404");
             }
-            const post: Post = {
-                _id: newData._id,
-                title: atob(newData.title || ""),
-                description: atob(newData.description || ""),
-                isPublic: newData.isPublic || false,
-                assignments: newData.assignments || [],
-            };
-            setPost(post);
-            setAssignmentList(assignmentList);
-        } else {
-            navigate("/404");
         }
-    }, [isLoading]);
+        fetchPost();
+    }, []);
     function handlePostChange(e: React.ChangeEvent<HTMLInputElement>) {
         const { name, value } = e.target;
         if (name === "isPublic") {
