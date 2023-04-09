@@ -44,10 +44,10 @@ export default function New() {
         const list: Assignment[] = [...assingmentList];
         list[assignment_index]["test_cases"] === undefined
             ? (list[assignment_index]["test_cases"] = [
-                  { replace: { from: "", to: "" }, stdin: "", stdout: "" },
+                  { replace: [{ from: "", to: "" }], stdin: "", stdout: "" },
               ])
             : list[assignment_index]["test_cases"].push({
-                  replace: { from: "", to: "" },
+                  replace: [{ from: "", to: "" }],
                   stdin: "",
                   stdout: "",
               });
@@ -89,21 +89,48 @@ export default function New() {
     function onTestCasesChange(
         e: React.ChangeEvent<any>,
         index: number,
-        testIndex: number
+        testIndex: number,
+        replaceIndex?: number
     ) {
         const obj: { name: string; value: string } = e.target;
         const { name, value } = obj;
         const list: Assignment[] = [...assingmentList];
         if (name === "from" || name === "to") {
-            list[index]["test_cases"][testIndex]["replace"][name] = value;
+            if (replaceIndex !== undefined) {
+                list[index]["test_cases"][testIndex]["replace"][replaceIndex][
+                    name
+                ] = value;
+            }
         } else if (name === "stdin" || name === "stdout") {
             list[index]["test_cases"][testIndex][name] = value;
         }
         setAssignmentList(list);
         setPost({ ...post, assignments: list });
     }
+    function addReplace(testIndex: number, assignment_index: number) {
+        const list: Assignment[] = [...assingmentList];
+        list[assignment_index]["test_cases"][testIndex]["replace"].push({
+            from: "",
+            to: "",
+        });
+        setAssignmentList(list);
+        setPost({ ...post, assignments: list });
+    }
+    function removeReplace(
+        testIndex: number,
+        assignment_index: number,
+        replaceIndex: number
+    ) {
+        const list: Assignment[] = [...assingmentList];
+        list[assignment_index]["test_cases"][testIndex]["replace"].splice(
+            replaceIndex,
+            1
+        );
+        setAssignmentList(list);
+        console.log(assingmentList[assignment_index]["test_cases"][testIndex]);
+        setPost({ ...post, assignments: list });
+    }
     async function savePost(e: React.FormEvent<HTMLFormElement>) {
-        const url = "http://localhost:3000";
         e.preventDefault();
         if (post.title === undefined) {
             alert("Title is required");
@@ -137,7 +164,7 @@ export default function New() {
                         {
                             stdin: "",
                             stdout: "",
-                            replace: { from: "", to: "" },
+                            replace: [{ from: "", to: "" }],
                         },
                     ];
                     return;
@@ -160,25 +187,50 @@ export default function New() {
                     post.assignments[i].test_cases[j].stdout
                 );
                 if (post.assignments[i].test_cases[j].replace === undefined) {
-                    post.assignments[i].test_cases[j].replace = {
-                        from: "",
-                        to: "",
-                    };
-                } else if (
-                    post.assignments[i].test_cases[j].replace.from === undefined
-                ) {
-                    post.assignments[i].test_cases[j].replace.from = "";
-                } else if (
-                    post.assignments[i].test_cases[j].replace.to === undefined
-                ) {
-                    post.assignments[i].test_cases[j].replace.to = "";
+                    post.assignments[i].test_cases[j].replace = [
+                        {
+                            from: "",
+                            to: "",
+                        },
+                    ];
                 } else {
-                    post.assignments[i].test_cases[j].replace.from = btoa(
-                        post.assignments[i].test_cases[j].replace.from
-                    );
-                    post.assignments[i].test_cases[j].replace.to = btoa(
-                        post.assignments[i].test_cases[j].replace.to
-                    );
+                    for (
+                        let k = 0;
+                        k < post.assignments[i].test_cases[j].replace.length;
+                        k++
+                    ) {
+                        if (
+                            post.assignments[i].test_cases[j].replace[k] ===
+                            undefined
+                        ) {
+                            post.assignments[i].test_cases[j].replace[k] = {
+                                from: "",
+                                to: "",
+                            };
+                        }
+                        if (
+                            post.assignments[i].test_cases[j].replace[k]
+                                .from === undefined
+                        ) {
+                            post.assignments[i].test_cases[j].replace[k].from =
+                                "";
+                        }
+                        if (
+                            post.assignments[i].test_cases[j].replace[k].to ===
+                            undefined
+                        ) {
+                            post.assignments[i].test_cases[j].replace[k].to =
+                                "";
+                        }
+                        post.assignments[i].test_cases[j].replace[k].from =
+                            btoa(
+                                post.assignments[i].test_cases[j].replace[k]
+                                    .from
+                            );
+                        post.assignments[i].test_cases[j].replace[k].to = btoa(
+                            post.assignments[i].test_cases[j].replace[k].to
+                        );
+                    }
                 }
             }
         }
@@ -339,56 +391,101 @@ export default function New() {
                                                                             <Form.Label>
                                                                                 Replace
                                                                             </Form.Label>
-                                                                            <Row className="mb-3">
-                                                                                <Col>
-                                                                                    <FloatingLabel
-                                                                                        controlId="floatingTextarea2"
-                                                                                        label="From"
-                                                                                    >
-                                                                                        <Form.Control
-                                                                                            as="textarea"
-                                                                                            placeholder="Leave a comment here"
-                                                                                            name={`from`}
-                                                                                            onChange={(
-                                                                                                e
-                                                                                            ) => {
-                                                                                                onTestCasesChange(
-                                                                                                    e,
-                                                                                                    index,
-                                                                                                    testIndex
-                                                                                                );
-                                                                                            }}
-                                                                                            style={{
-                                                                                                height: "100px",
-                                                                                            }}
-                                                                                        />
-                                                                                    </FloatingLabel>
-                                                                                </Col>
-                                                                                <Col>
-                                                                                    <FloatingLabel
-                                                                                        controlId="floatingTextarea2"
-                                                                                        label="To"
-                                                                                    >
-                                                                                        <Form.Control
-                                                                                            as="textarea"
-                                                                                            name="to"
-                                                                                            onChange={(
-                                                                                                e
-                                                                                            ) => {
-                                                                                                onTestCasesChange(
-                                                                                                    e,
-                                                                                                    index,
-                                                                                                    testIndex
-                                                                                                );
-                                                                                            }}
-                                                                                            placeholder="Leave a comment here"
-                                                                                            style={{
-                                                                                                height: "100px",
-                                                                                            }}
-                                                                                        />
-                                                                                    </FloatingLabel>
-                                                                                </Col>
-                                                                            </Row>
+                                                                            <br></br>
+                                                                            {test.replace.map(
+                                                                                (
+                                                                                    replace,
+                                                                                    replaceIndex
+                                                                                ) => {
+                                                                                    return (
+                                                                                        <Row className="mb-3">
+                                                                                            <Col xs="5">
+                                                                                                <FloatingLabel
+                                                                                                    controlId="floatingTextarea2"
+                                                                                                    label="From"
+                                                                                                >
+                                                                                                    <Form.Control
+                                                                                                        as="textarea"
+                                                                                                        placeholder="Leave a comment here"
+                                                                                                        name={`from`}
+                                                                                                        value={
+                                                                                                            replace.from
+                                                                                                        }
+                                                                                                        onChange={(
+                                                                                                            e
+                                                                                                        ) => {
+                                                                                                            onTestCasesChange(
+                                                                                                                e,
+                                                                                                                index,
+                                                                                                                testIndex,
+                                                                                                                replaceIndex
+                                                                                                            );
+                                                                                                        }}
+                                                                                                        style={{
+                                                                                                            height: "100px",
+                                                                                                        }}
+                                                                                                    />
+                                                                                                </FloatingLabel>
+                                                                                            </Col>
+                                                                                            <Col xs="5">
+                                                                                                <FloatingLabel
+                                                                                                    controlId="floatingTextarea2"
+                                                                                                    label="To"
+                                                                                                >
+                                                                                                    <Form.Control
+                                                                                                        as="textarea"
+                                                                                                        name="to"
+                                                                                                        value={
+                                                                                                            replace.to
+                                                                                                        }
+                                                                                                        onChange={(
+                                                                                                            e
+                                                                                                        ) => {
+                                                                                                            onTestCasesChange(
+                                                                                                                e,
+                                                                                                                index,
+                                                                                                                testIndex,
+                                                                                                                replaceIndex
+                                                                                                            );
+                                                                                                        }}
+                                                                                                        placeholder="Leave a comment here"
+                                                                                                        style={{
+                                                                                                            height: "100px",
+                                                                                                        }}
+                                                                                                    />
+                                                                                                </FloatingLabel>
+                                                                                            </Col>
+                                                                                            <Col xs="2">
+                                                                                                <Button
+                                                                                                    variant="danger"
+                                                                                                    onClick={() => {
+                                                                                                        removeReplace(
+                                                                                                            testIndex,
+                                                                                                            index,
+                                                                                                            replaceIndex
+                                                                                                        );
+                                                                                                    }}
+                                                                                                >
+                                                                                                    remove
+                                                                                                </Button>
+                                                                                            </Col>
+                                                                                        </Row>
+                                                                                    );
+                                                                                }
+                                                                            )}
+                                                                            <Button
+                                                                                variant="primary"
+                                                                                className="mb-3"
+                                                                                onClick={() => {
+                                                                                    addReplace(
+                                                                                        testIndex,
+                                                                                        index
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                Add
+                                                                                Replace
+                                                                            </Button>
                                                                             <FloatingLabel
                                                                                 controlId="floatingTextarea2"
                                                                                 label="Stdin"
