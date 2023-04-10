@@ -209,51 +209,64 @@ class Worker():
             None
         """
         data = json.loads(body.decode())
+        # --------------------------------------------------------------------------
+        # Get Details from submission database
+        submission_id = data["submission_id"]
+        data = self.redis_command(self.redis.get, submission_id)
+        submission_data = json.loads(data.decode())
+        # --------------------------------------------------------------------------
         # handle multiple input file
-        submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result"]] = {
+        submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result", "replace", "stdin"]] = {
             "stdout": [],
             "stderr": [],
-            "test_cases": data["test_cases"],
-            "replace": data["replace"]
+            "test_cases": submission_data["test_cases"],
+            "replace": submission_data["replace"], # replace: [[{"from": "from", "to": "to"}, {"from": "from", "to": "to"}], [{"from": "from", "to": "to"}], ...]
+            "submission_id": submission_id,
+            "stdin": submission_data["input"],
         }
-        for index, code_input in enumerate(data["input"]):
-            # --------------------------------------------------------------------------
-            # Decode from base64 to string
-            # Decode data["code"] from base64 to string
-            code = base64.b64decode(data["code"]).decode()
-            # Decode data["replace"]["from"] from base64 to string
-            _from = base64.b64decode(data["replace"][index]["from"]).decode()
-            # Decode data["replace"]["to"] from base64 to string
-            _to = base64.b64decode(data["replace"][index]["to"]).decode()
-            # Decode stdin from base64 to string
-            code_input = base64.b64decode(code_input).decode()
-            # --------------------------------------------------------------------------
-            # Replace the code
-            code = self.transform_code(code, _from, _to)
-            # Save the code, input to a file
-            self.save_code(code, data["language"])
-            # Save the stdin to a file
-            self.__save_input(code_input)
-            stdout, stderr = self.__execute(data["language"])
-            # --------------------------------------------------------------------------
-            # Encode the output to base64
-            stdout = base64.b64encode(stdout.encode('utf-8')).decode()
-            stderr = base64.b64encode(stderr.encode('utf-8')).decode()
-            # --------------------------------------------------------------------------
-            # Append the output to the submission
-            submission["stderr"].append(stderr)
-            submission["stdout"].append(stdout)
+        for index, code_input in enumerate(submission_data["input"]):
+            try:
+                # --------------------------------------------------------------------------
+                # Decode submission_data["code"] from base64 to string
+                code = base64.b64decode(submission_data["code"]).decode()
+                # Decode stdin from base64 to string
+                code_input = base64.b64decode(code_input).decode()
+                # --------------------------------------------------------------------------
+                # Decode submission_data["replace"][index]["from"] and submission_data["replace"][index]["to"] from base64 to string and transform the code
+                for replaces in submission_data["replace"][index]:
+                    _from = base64.b64decode(replaces["from"]).decode()
+                    _to = base64.b64decode(replaces["to"]).decode()
+                    code = self.transform_code(code, _from, _to)
+                # --------------------------------------------------------------------------
+                # Save the code, input to a file
+                self.save_code(code, submission_data["language"])
+                # Save the stdin to a file
+                self.__save_input(code_input)
+                stdout, stderr = self.__execute(submission_data["language"])
+                # --------------------------------------------------------------------------
+                # Encode the output to base64
+                stdout = base64.b64encode(stdout.encode('utf-8')).decode()
+                stderr = base64.b64encode(stderr.encode('utf-8')).decode()
+                # --------------------------------------------------------------------------
+                # Append the output to the submission
+                submission["stderr"].append(stderr)
+                submission["stdout"].append(stdout)
+            except Exception as e:
+                stderr = base64.b64encode(e.__str__().encode('utf-8')).decode()
+                submission["stderr"].append(stderr)
+                submission["stdout"].append("")
+                break
         submission["status"] = "done execution"
         # Save the result to submission database
         self.redis_command(self.redis.set,
-                        data["submission_id"], json.dumps(submission), 600)
+                        submission_id, json.dumps(submission), 600)
         # Send the output to judge
-        if (self.__judge(data["submission_id"]) != 200):
+        if (self.__judge(submission_id) != 200):
             submission["result"] = "Judge Error"
             self.redis_command(self.redis.set,
-                        data["submission_id"], json.dumps(submission), 600)
+                        submission_id, json.dumps(submission), 600)
         # Clean up
-        self.__clean_up(data["language"])
+        self.__clean_up(submission_data["language"])
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def __judge(self, submission_id: str) -> int:

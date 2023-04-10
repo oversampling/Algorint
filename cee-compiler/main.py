@@ -144,7 +144,7 @@ class Worker():
                 if (status["OOMKilled"] == True):
                     raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
                 else:
-                    time.sleep(1) # Wait for the output to be written to the container
+                    time.sleep(0.2) # Wait for the output to be written to the container
                     raise ApplicationError(process, sandbox.output()[1])
             else:
                 return None
@@ -234,44 +234,53 @@ class Worker():
         Args:
             body:
                 The message body. It is a JSON string that contains the following fields:
-                    - code: The code to be executed
-                    - language: The language of the code
-                    - input: The input to the code
-                    - test_cases: The test cases to be executed
-                    - submission_id: The id of the submission
+                    - code str: The code to be executed
+                    - language str: The language of the code
+                    - input str[]: The input to the code
+                    - test_cases str[]: The test cases to be executed
+                    - submission_id str: The id of the submission
+                    - replace {from: str, to: str}[][]: The string to be replaced in the code in array
         Returns:
             None
         Raises:
             None
         """
         data = json.loads(body.decode())
+        # --------------------------------------------------------------------------
+        # Get Details from submission database
+        submission_id = data["submission_id"]
+        data = self.redis_command(self.redis.get, submission_id)
+        submission_data = json.loads(data.decode())
+        # --------------------------------------------------------------------------
         # handle multiple input file
-        submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result"]] = {
+        submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result", "replace", "stdin"]] = {
             "stdout": [],
             "stderr": [],
-            "test_cases": data["test_cases"],
-            "replace": data["replace"]
+            "test_cases": submission_data["test_cases"],
+            "replace": submission_data["replace"],
+            "submission_id": submission_id,
+            "stdin": submission_data["input"],
         }
-        for index, code_input in enumerate(data["input"]):
+        for index, code_input in enumerate(submission_data["input"]):
             # --------------------------------------------------------------------------
             # Decode from base64 to string
-            # Decode data["code"] from base64
+            # Decode submission_data["code"] from base64
             try:
-                code = base64.b64decode(data["code"]).decode()
+                code = base64.b64decode(submission_data["code"]).decode()
                 # Decode code input
                 code_input = base64.b64decode(code_input).decode()
-                # Decode data["replace"]["from"] from base64 to string
-                _from = base64.b64decode(data["replace"][index]["from"]).decode()
-                # Decode data["replace"]["to"] from base64 to string
-                _to = base64.b64decode(data["replace"][index]["to"]).decode()
                 # --------------------------------------------------------------------------
-                # Replace the code
-                code = self.transform_code(code, _from, _to)
+                # Decode submission_data["replace"][index]["from"] and submission_data["replace"][index]["to"] from base64 to string and transform the code
+                for replaces in submission_data["replace"][index]:
+                    _from = base64.b64decode(replaces["from"]).decode()
+                    _to = base64.b64decode(replaces["to"]).decode()
+                    code = self.transform_code(code, _from, _to)
+                # --------------------------------------------------------------------------
                 # Save the code, input to a file
-                self.save_code(code, data["language"])
+                self.save_code(code, submission_data["language"])
                 # Save the stdin to a file
                 self.__save_input(code_input)
-                stdout, stderr = self.__execute(data["language"])
+                stdout, stderr = self.__execute(submission_data["language"])
                 # --------------------------------------------------------------------------
                 # Encode the output to base64
                 stdout = base64.b64encode(stdout.encode('utf-8')).decode()
@@ -288,14 +297,14 @@ class Worker():
         submission["status"] = "done execution"
         # Save the result to submission database
         self.redis_command(self.redis.set,
-                        data["submission_id"], json.dumps(submission), 600)
+                        submission_id, json.dumps(submission), 600)
         # Send the output to judge
-        if (self.__judge(data["submission_id"]) != 200):
+        if (self.__judge(submission_id) != 200):
             submission["result"] = "Judge Error"
             self.redis_command(self.redis.set,
-                        data["submission_id"], json.dumps(submission), 600)
+                        submission_id, json.dumps(submission), 600)
         # Clean up
-        self.__clean_up(data["language"])
+        self.__clean_up(submission_data["language"])
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def __judge(self, submission_id: str) -> int:

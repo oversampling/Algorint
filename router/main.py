@@ -4,7 +4,7 @@ import os
 import json
 from flask import Flask
 from dotenv import load_dotenv
-from flask import abort, jsonify, request
+from flask import jsonify, request
 from redis.sentinel import Sentinel
 import time
 from flask_cors import CORS
@@ -106,12 +106,12 @@ def make_submission():
     {
         "language": <str>,
         "code": <str>,
-        "input": [<str>],
-        "test_cases" [<str>]
-        "replace": [{"from": <str>, "to": <str>}]
+        "input": <str>[],
+        "test_cases" <str>[],
+        "replace": {"from": <str>, "to": <str>}[][]
     }
     """
-    # Retrieve submission data
+    # Retrieve submission data from request body
     data = request.get_json()
     language = data["language"]
     code = data["code"]
@@ -122,6 +122,12 @@ def make_submission():
     submission_id = str(uuid.uuid4())
     submission = {
         "status": "pending",
+        "language": language,
+        "code": code,
+        "input": input,
+        "test_cases": test_cases,
+        "replace": replace,
+        "submission_id": submission_id,
     }
     execute_command(redis_master.set, submission_id,
                     json.dumps(submission), 600)
@@ -129,17 +135,15 @@ def make_submission():
     if (language is None):
         return jsonify({"error": "language is required"}), 400
     if (language in ["python", "nodejs"]):
-        cee_intrepreter_submission(
-            language, code, input, test_cases, submission_id, replace)
+        cee_intrepreter_submission(submission_id)
     elif (language in ["c", "cpp", "rust"]):
-        cee_compiler_submission(
-            language, code, input, test_cases, submission_id, replace)
+        cee_compiler_submission(submission_id)
     else:
         return jsonify({"error": "language not supported"}), 400
     return submission_id
 
 
-def cee_intrepreter_submission(language, code, input, test_cases, submission_id, replace):
+def cee_intrepreter_submission(submission_id):
     """
     language: str
     code: str
@@ -148,12 +152,11 @@ def cee_intrepreter_submission(language, code, input, test_cases, submission_id,
     """
     cee_interpreter_queue_name = os.getenv(
         "CEE_INTERPRETER_QUEUE_NAME").strip()
-    message = {"language": language, "code": code,
-               "input": input, "test_cases": test_cases, "submission_id": submission_id, "replace": replace}
+    message = {"submission_id": submission_id}
     enqueue_submission(message, cee_interpreter_queue_name)
 
 
-def cee_compiler_submission(language, code, input, test_cases, submission_id, replace):
+def cee_compiler_submission(submission_id):
     """
     language: str
     code: str
@@ -161,8 +164,7 @@ def cee_compiler_submission(language, code, input, test_cases, submission_id, re
     submission_id: "id that store in submission database"
     """
     cee_compiler_queue_name = os.getenv("CEE_COMPILER_QUEUE_NAME").strip()
-    message = {"language": language, "code": code,
-               "input": input, "test_cases": test_cases, "submission_id": submission_id, "replace": replace}
+    message = {"submission_id": submission_id}
     enqueue_submission(message, cee_compiler_queue_name)
 
 
