@@ -6,6 +6,7 @@ import {
     Form,
     OverlayTrigger,
     Popover,
+    Spinner,
     Stack,
 } from "react-bootstrap";
 import { Link, useParams } from "react-router-dom";
@@ -36,6 +37,10 @@ export default function Posts() {
     const [submissionResult, setSubmissionResult] = useState<
         ISubmission_Result[]
     >([]);
+    const [showRefreshSpinner, setShowRefreshSpinner] =
+        useState<boolean>(false);
+    const [submissionToken, setSubmissionToken] = useState<string>("");
+    const [showRefreshBtn, setShowRefreshBtn] = useState<boolean>(false);
     const [executeCode, { isLoading: execution_status }] =
         useExecuteCodeMutation();
     const [fetchExecutionResult, { isLoading: execution_result }] =
@@ -119,6 +124,8 @@ export default function Posts() {
         ms: number,
         index: number
     ): Promise<number> {
+        setShowRefreshBtn(false);
+        setSubmissionToken("");
         setSubmissionResult([]);
         for (let i = 0; i < max_retries; i++) {
             const response = await fetchExecutionResultWithSleep(
@@ -148,7 +155,40 @@ export default function Posts() {
                 return 0;
             }
         }
+        setSubmissionToken(submission_token);
+        setShowRefreshBtn(true);
         return -1;
+    }
+    async function refreshSubmissionResultClick(assingment_index: number) {
+        setShowRefreshSpinner(true);
+        const response = await fetchExecutionResultWithSleep(
+            submissionToken,
+            0
+        );
+        await timeout(1000);
+        setShowRefreshSpinner(false);
+        if (response.status === "done execution") {
+            setShowRefreshBtn(false);
+            const textarea = document.getElementById(
+                `execution-result-${assingment_index}`
+            ) as HTMLInputElement;
+            const subResultArray: ISubmission_Result[] = [];
+            if (textarea != null) {
+                let result: string = "";
+                for (let i = 0; i < response.stdout.length; i++) {
+                    result += `Test Case ${i + 1} : ${
+                        response.result[i] ? "Passed" : "Failed"
+                    }\n`;
+                    const subResult: ISubmission_Result = {
+                        stderr: atob(response.stderr[i]),
+                        stdout: atob(response.stdout[i]),
+                        result: response.result[i],
+                    };
+                    subResultArray.push(subResult);
+                }
+                setSubmissionResult(subResultArray);
+            }
+        }
     }
     async function handle_execution(assignmentIndex: number) {
         if (assignmentCode) {
@@ -174,6 +214,7 @@ export default function Posts() {
             const data = await executeCode(body).unwrap();
             const submission_token = data.submission_token;
             await fetchExecutionResultLoop(20, submission_token, 2000, index);
+            setSubmissionToken(submission_token);
             execution_button && (execution_button.disabled = false);
             execution_result && (execution_result.disabled = false);
             submit_button && (submit_button.disabled = false);
@@ -208,7 +249,7 @@ export default function Posts() {
                     const submission_token: string = response.submission_token;
                     console.log(submission_token);
                     await fetchSubmissionResultLoop(
-                        20,
+                        5,
                         submission_token,
                         2000,
                         index
@@ -362,6 +403,46 @@ export default function Posts() {
                                                             }}
                                                             id={`execution-result-${index}`}
                                                         >
+                                                            {showRefreshBtn && (
+                                                                <div>
+                                                                    <p>
+                                                                        <i>
+                                                                            Sorry!
+                                                                            Your
+                                                                            program
+                                                                            take
+                                                                            too
+                                                                            long
+                                                                            to
+                                                                            execute,
+                                                                            refresh
+                                                                            your
+                                                                            result
+                                                                            in a
+                                                                            while
+                                                                        </i>
+                                                                    </p>
+                                                                    <div>
+                                                                        <Button
+                                                                            variant="primary"
+                                                                            onClick={() => {
+                                                                                refreshSubmissionResultClick(
+                                                                                    index
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            Refresh
+                                                                        </Button>
+                                                                        {showRefreshSpinner && (
+                                                                            <Spinner
+                                                                                animation="border"
+                                                                                variant="info"
+                                                                                className="mx-2"
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                             {submissionResult.length !==
                                                             0
                                                                 ? submissionResult.map(
