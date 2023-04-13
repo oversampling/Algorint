@@ -17,7 +17,7 @@ import {
     useExecuteCodeMutation,
     useFetchExecutionResultMutation,
     useSubmitCodeMutation,
-    useViewPostQuery,
+    useViewPostMutation,
 } from "../features/posts/postsApiSlice";
 import {
     IAssignment_Code_Execution,
@@ -29,8 +29,9 @@ import {
 
 export default function Posts() {
     const { id } = useParams<{ id: string }>();
-    const { data, isLoading }: { data?: Post; isLoading: boolean } =
-        useViewPostQuery(id || "");
+    const [postData, setPostData] = useState<Post | undefined>();
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [viewPost] = useViewPostMutation();
     const [assignmentCode, setassignmentCode] = useState<
         IAssignment_Code_Execution[] | undefined
     >();
@@ -48,25 +49,32 @@ export default function Posts() {
     const [submitCode, { isLoading: submission_reuslt }] =
         useSubmitCodeMutation();
     useEffect(() => {
-        if (data) {
-            if (data.assignments.length > 0) {
-                const newCode: IAssignment_Code_Execution[] = [];
-                for (let i = 0; i < data.assignments.length; i++) {
-                    const newCodeItem: IAssignment_Code_Execution = {
-                        code: data.assignments[i].code_template,
-                        language: data.assignments[i].language,
-                        index: i,
-                    };
-                    newCode.push(newCodeItem);
+        async function viewPostData() {
+            setIsLoading(true);
+            const payload: Post = await viewPost(id || "").unwrap();
+            if (payload) {
+                if (payload.assignments.length > 0) {
+                    const newCode: IAssignment_Code_Execution[] = [];
+                    for (let i = 0; i < payload.assignments.length; i++) {
+                        const newCodeItem: IAssignment_Code_Execution = {
+                            code: payload.assignments[i].code_template,
+                            language: payload.assignments[i].language,
+                            index: i,
+                        };
+                        newCode.push(newCodeItem);
+                    }
+                    // Decode from base64 to string
+                    for (let i = 0; i < newCode.length; i++) {
+                        newCode[i].code = atob(newCode[i].code);
+                    }
+                    setassignmentCode(newCode);
                 }
-                // Decode from base64 to string
-                for (let i = 0; i < newCode.length; i++) {
-                    newCode[i].code = atob(newCode[i].code);
-                }
-                setassignmentCode(newCode);
+                setPostData(payload);
             }
+            setIsLoading(false);
         }
-    }, [data]);
+        viewPostData();
+    }, []);
     function onCodeChange(data: string, language: string, index?: number) {
         if (index != undefined) {
             setassignmentCode((prev) => {
@@ -224,8 +232,8 @@ export default function Posts() {
         if (assignmentCode) {
             const { code, language, index }: IAssignment_Code_Execution =
                 assignmentCode[assignmentIndex];
-            if (data?.assignments[index]) {
-                if (data.assignments[index]._id) {
+            if (postData?.assignments[index]) {
+                if (postData.assignments[index]._id) {
                     const submit_button = document.getElementById(
                         `btn-execute-${index}`
                     ) as HTMLInputElement;
@@ -242,7 +250,7 @@ export default function Posts() {
                     const submission: IAssignment_Code_Submission = {
                         code: btoa(code),
                         language,
-                        assignment_id: data.assignments[index]._id || "",
+                        assignment_id: postData.assignments[index]._id || "",
                         index,
                     };
                     const response = await submitCode(submission).unwrap();
@@ -284,13 +292,13 @@ export default function Posts() {
                                 </Card.Body>
                             </Card>
                         ) : (
-                            data && (
+                            postData && (
                                 <Card className="shadow-sm bg-body rounded border-0">
                                     <Card.Header>
                                         <Stack direction="horizontal" gap={3}>
-                                            <div>{atob(data["title"])}</div>
+                                            <div>{atob(postData["title"])}</div>
                                             <div className="ms-auto">
-                                                {data["stars"]}
+                                                {postData["stars"]}
                                                 <span className="mx-1">
                                                     <i
                                                         className="fa-duotone fa-caret-up fa-xl"
@@ -304,7 +312,9 @@ export default function Posts() {
                                     </Card.Header>
                                     <Card.Body>
                                         <MarkdownPreview
-                                            value={atob(data["description"])}
+                                            value={atob(
+                                                postData["description"]
+                                            )}
                                         />
                                     </Card.Body>
                                     <hr
@@ -313,7 +323,7 @@ export default function Posts() {
                                             margin: "auto",
                                         }}
                                     />
-                                    {data["assignments"].map(
+                                    {postData["assignments"].map(
                                         (assignment, index: number) => (
                                             <Form key={index}>
                                                 <Card
@@ -393,13 +403,16 @@ export default function Posts() {
                                                                 </Card.Body>
                                                             </Card>
                                                         </div>
+                                                        <p>Result</p>
                                                         <div
                                                             className="shadow-none p-3 mb-5 bg-light rounded"
                                                             style={{
                                                                 minHeight:
                                                                     "20px",
                                                                 maxHeight:
-                                                                    "100%",
+                                                                    "100px",
+                                                                overflowY:
+                                                                    "auto",
                                                             }}
                                                             id={`execution-result-${index}`}
                                                         >
@@ -470,32 +483,48 @@ export default function Posts() {
                                                                                           <Popover.Body>
                                                                                               <div>
                                                                                                   <strong>
-                                                                                                      {result.result
+                                                                                                      {result[
+                                                                                                          "stdout"
+                                                                                                      ] !==
+                                                                                                      ""
                                                                                                           ? "STDOUT"
                                                                                                           : "STDERR"}
                                                                                                   </strong>
                                                                                               </div>
-                                                                                              <div>
-                                                                                                  {result.result
+                                                                                              <span>
+                                                                                                  {result[
+                                                                                                      "stdout"
+                                                                                                  ] !==
+                                                                                                  ""
                                                                                                       ? result.stdout
                                                                                                       : result.stderr}
-                                                                                              </div>
+                                                                                              </span>
                                                                                           </Popover.Body>
                                                                                       </Popover>
                                                                                   }
                                                                               >
-                                                                                  <Button
-                                                                                      className="mx-1"
-                                                                                      variant={
-                                                                                          result.result
-                                                                                              ? "success"
-                                                                                              : "danger"
-                                                                                      }
-                                                                                  >
-                                                                                      {result.result
-                                                                                          ? "PASS"
-                                                                                          : "FAIL"}
-                                                                                  </Button>
+                                                                                  <div className="d-flex my-1 align-items-center">
+                                                                                      <p className="my-auto">
+                                                                                          Test
+                                                                                          Case{" "}
+                                                                                          {index +
+                                                                                              1}
+
+                                                                                          :
+                                                                                      </p>
+                                                                                      <Button
+                                                                                          className="mx-1"
+                                                                                          variant={
+                                                                                              result.result
+                                                                                                  ? "success"
+                                                                                                  : "danger"
+                                                                                          }
+                                                                                      >
+                                                                                          {result.result
+                                                                                              ? "PASS"
+                                                                                              : "FAIL"}
+                                                                                      </Button>
+                                                                                  </div>
                                                                               </OverlayTrigger>
                                                                           );
                                                                       }
