@@ -51,3 +51,4 @@ metadata:
 data:
   ENV: production
   MONGO_URI: mongodb://mongo.mongo.svc.cluster.local:27017
+  ROUTER_URL: http://router-service.router.svc.cluster.local:80

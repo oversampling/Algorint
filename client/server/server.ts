@@ -29,6 +29,7 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(express.urlencoded({ extended: true }))
 process.env.ENV === "production" && app.use(express.static(path.join(__dirname, '../../dist')));
+const ROUTER_URL = process.env.ROUTER_URL || "http://localhost:80"
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 async function verify(token: string): Promise<Boolean> {
     try{
@@ -226,7 +227,7 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
 
 app.post("/api/posts/assignment/execute", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
     const {code, language} = req.body;
-    const response = await axios.post("http://localhost/make_submission", {
+    const response = await axios.post(`${ROUTER_URL}/make_submission`, {
         code,
         language,
         test_cases: [""],
@@ -238,7 +239,7 @@ app.post("/api/posts/assignment/execute", isLoggedIn, async (req: Request, res: 
 
 app.get("/api/posts/assignment/fetch_result/:submission_token", isLoggedIn,  async (req: Request, res: Response, next: NextFunction) => {
     const { submission_token } = req.params
-    const response = await axios.get(`http://localhost/retrieve_submission/${submission_token}`)
+    const response = await axios.get(`${ROUTER_URL}/retrieve_submission/${submission_token}`)
     res.json(response.data)
 })
 
@@ -249,7 +250,7 @@ app.post("/api/posts/assignment/submit", isLoggedIn, async (req: Request, res: R
     const stdin: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdin)
     const stdout: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdout)
     const replace: {from: string, to: string}[][] = assignment.test_cases.map((test_case: any)=> test_case.replace)
-    const response = await axios.post("http://localhost/make_submission", {
+    const response = await axios.post(`${ROUTER_URL}/make_submission`, {
         code,
         language,
         test_cases: stdout,
