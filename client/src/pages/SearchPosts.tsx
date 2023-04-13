@@ -1,10 +1,8 @@
-import { Stack, Tab, Tabs } from "react-bootstrap";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Tab, Tabs } from "react-bootstrap";
+import { Link, useSearchParams } from "react-router-dom";
 import Header from "../component/Header";
-import useFetch from "../hooks/useFetch";
 import { Post } from "../interface";
 import PostList from "../component/PostsList";
-import { useState } from "react";
 import { useSearchPostsQuery } from "../features/posts/postsApiSlice";
 
 export default function SearchPosts() {

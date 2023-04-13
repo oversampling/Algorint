@@ -17,7 +17,7 @@ export const postsApiSlice = apiSlice.injectEndpoints({
                 params: {search: search, stars: stars, publishDate: publishDate, limit: limit, page: page}
             })
         }),
-        viewPost: builder.query({
+        viewPost: builder.mutation({
             query: (id: string) => ({
                 url: `/api/posts/${id}`,
                 method: 'GET'
@@ -73,6 +73,6 @@ export const postsApiSlice = apiSlice.injectEndpoints({
 })
 
 export const {
-    useAddNewPostMutation, useSearchPostsQuery, useViewPostQuery, useExecuteCodeMutation, useFetchExecutionResultMutation, useSubmitCodeMutation, useFetchAccountPostsMutation,
+    useAddNewPostMutation, useSearchPostsQuery, useViewPostMutation, useExecuteCodeMutation, useFetchExecutionResultMutation, useSubmitCodeMutation, useFetchAccountPostsMutation,
     useDeleteAccountPostMutation, useUpdateAccountPostMutation, useViewPostUpdateMutation
 } = postsApiSlice
