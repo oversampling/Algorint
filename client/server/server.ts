@@ -205,7 +205,8 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
                         const newTestCase = new TestCase({
                             stdin: test_case.stdin,
                             stdout: test_case.stdout,
-                            replace: test_case.replace ? test_case.replace : [{from: "", to: ""}]
+                            replace: test_case.replace ? test_case.replace : [{from: "", to: ""}],
+                            isHidden: test_case.isHidden
                         });
                         await newTestCase.save();
                         newAssignment.test_cases.push(newTestCase._id);
@@ -339,12 +340,14 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                         testCaseToUpdate.stdin = test_case.stdin;
                                         testCaseToUpdate.stdout = test_case.stdout;
                                         testCaseToUpdate.replace = test_case.replace || [{from: "", to: ""}];
+                                        testCaseToUpdate.isHidden = test_case.isHidden;
                                         await testCaseToUpdate.save();
                                     }else{
                                         const newTestCase = new TestCase({
                                             stdin: test_case.stdin,
                                             stdout: test_case.stdout,
-                                            replace: test_case.replace || [{from: "", to: ""}]
+                                            replace: test_case.replace || [{from: "", to: ""}],
+                                            isHidden: test_case.isHidden
                                         });
                                         await newTestCase.save();
                                         assingmentToUpdate.test_cases.push(newTestCase._id);
@@ -369,6 +372,7 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                         testCaseToUpdate.stdin = test_case.stdin;
                                         testCaseToUpdate.stdout = test_case.stdout;
                                         testCaseToUpdate.replace = test_case.replace;
+                                        testCaseToUpdate.isHidden = test_case.isHidden;
                                         await testCaseToUpdate.save();
                                     }
                                 }else{
@@ -376,6 +380,7 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                         stdin: test_case.stdin,
                                         stdout: test_case.stdout,
                                         replace: test_case.replace ? test_case.replace : [{from: "", to: ""}],
+                                        isHidden: test_case.isHidden
                                     });
                                     await newTestCase.save();
                                     newAssignment.test_cases.push(newTestCase._id);

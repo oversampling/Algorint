@@ -16,7 +16,8 @@ export interface INewPost {
                     replace: [{
                         from: string,
                         to: string,
-                    }]
+                    }],
+                    isHidden: boolean,
                 }
             ]
         }

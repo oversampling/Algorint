@@ -6,6 +6,7 @@ export interface Test_Case {
     }[];
     stdin: string;
     stdout: string;
+    isHidden: boolean;
 }
 
 export interface Assignment {

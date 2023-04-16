@@ -8,7 +8,8 @@ export interface ITestCase {
     replace: [{
         from: string,
         to: string,
-    }]
+    }],
+    isHidden: boolean,
 }
 
 const TestCaseSchema = new Schema<ITestCase>({
@@ -20,6 +21,10 @@ const TestCaseSchema = new Schema<ITestCase>({
             to: String,
         }],
         default: []
+    },
+    isHidden: {
+        type: Boolean,
+        default: true
     }
 });
 

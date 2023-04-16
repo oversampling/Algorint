@@ -5,8 +5,10 @@ import {
     Col,
     FloatingLabel,
     Form,
+    OverlayTrigger,
     Row,
     Stack,
+    Tooltip,
 } from "react-bootstrap";
 import Code from "../component/Editor/Code";
 import { useNavigate, useParams } from "react-router-dom";
@@ -28,7 +30,6 @@ export default function EditPost() {
     useEffect(() => {
         async function fetchPost() {
             const data = await viewPostUpdate(id || "").unwrap();
-            console.log(data);
             const newData = { ...data };
             if (newData) {
                 const assignmentList: Assignment[] = [];
@@ -74,6 +75,9 @@ export default function EditPost() {
                                 stdout: atob(
                                     newData.assignments[i].test_cases[j].stdout
                                 ),
+                                isHidden:
+                                    newData.assignments[i].test_cases[j]
+                                        .isHidden,
                             };
                             testCases.push(testCase);
                         }
@@ -128,12 +132,18 @@ export default function EditPost() {
         const list: Assignment[] = [...assingmentList];
         list[assignment_index]["test_cases"] === undefined
             ? (list[assignment_index]["test_cases"] = [
-                  { replace: [{ from: "", to: "" }], stdin: "", stdout: "" },
+                  {
+                      replace: [{ from: "", to: "" }],
+                      stdin: "",
+                      stdout: "",
+                      isHidden: true,
+                  },
               ])
             : list[assignment_index]["test_cases"].push({
                   replace: [{ from: "", to: "" }],
                   stdin: "",
                   stdout: "",
+                  isHidden: true,
               });
         setAssignmentList(list);
         setPost({ ...post, assignments: list });
@@ -187,6 +197,8 @@ export default function EditPost() {
             }
         } else if (name === "stdin" || name === "stdout") {
             list[index]["test_cases"][testIndex][name] = value;
+        } else if (name === "isHidden") {
+            list[index]["test_cases"][testIndex][name] = e.target.checked;
         }
         setAssignmentList(list);
         setPost({ ...post, assignments: list });
@@ -248,6 +260,7 @@ export default function EditPost() {
                             stdin: "",
                             stdout: "",
                             replace: [{ from: "", to: "" }],
+                            isHidden: true,
                         },
                     ];
                     return;
@@ -501,17 +514,57 @@ export default function EditPost() {
                                                                         }
                                                                     >
                                                                         <Card.Body>
-                                                                            <Form.Label>
+                                                                            <Form.Label className="d-flex justify-content-between">
                                                                                 Replace
+                                                                                <OverlayTrigger
+                                                                                    overlay={
+                                                                                        <Tooltip
+                                                                                            id={`tooltip-${index}-${testIndex}`}
+                                                                                        >
+                                                                                            If
+                                                                                            selected,
+                                                                                            this
+                                                                                            test
+                                                                                            case
+                                                                                            will
+                                                                                            be
+                                                                                            enable
+                                                                                            on
+                                                                                            test
+                                                                                            run
+                                                                                        </Tooltip>
+                                                                                    }
+                                                                                >
+                                                                                    <Form.Check
+                                                                                        type="checkbox"
+                                                                                        id={`hidden-${index}-${testIndex}`}
+                                                                                        label={`Set As Sample Test Case`}
+                                                                                        name="isHidden"
+                                                                                        checked={
+                                                                                            test.isHidden
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            e
+                                                                                        ) => {
+                                                                                            onTestCasesChange(
+                                                                                                e,
+                                                                                                index,
+                                                                                                testIndex
+                                                                                            );
+                                                                                        }}
+                                                                                    />
+                                                                                </OverlayTrigger>
                                                                             </Form.Label>
-                                                                            <br></br>
                                                                             {test.replace.map(
                                                                                 (
                                                                                     replace,
                                                                                     replaceIndex
                                                                                 ) => {
                                                                                     return (
-                                                                                        <Row className="mb-3">
+                                                                                        <Row
+                                                                                            className="mb-3"
+                                                                                            key={`${replaceIndex}`}
+                                                                                        >
                                                                                             <Col xs="5">
                                                                                                 <FloatingLabel
                                                                                                     controlId="floatingTextarea2"
