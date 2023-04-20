@@ -43,7 +43,7 @@ export default function Posts({ posts }: { posts?: Post[] }) {
                             to="/posts/new"
                             className="position-absolute top-0 end-0 btn btn-primary mx-2"
                         >
-                            New Post
+                            New Tutorial
                         </Link>
                     </div>
                 </div>

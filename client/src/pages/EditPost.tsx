@@ -439,6 +439,16 @@ export default function EditPost() {
                                                                     aria-label="Default select example"
                                                                     className="w-25"
                                                                     name="language"
+                                                                    defaultValue={
+                                                                        assignment[
+                                                                            "language"
+                                                                        ] ===
+                                                                        undefined
+                                                                            ? "python"
+                                                                            : assignment[
+                                                                                  "language"
+                                                                              ]
+                                                                    }
                                                                     onChange={(
                                                                         e
                                                                     ) =>
