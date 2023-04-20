@@ -38,6 +38,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: client-configmap
+            - secretRef:
+                name: client-secrets
           ports:
             - containerPort: 3000
               name: http
