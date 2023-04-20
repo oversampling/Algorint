@@ -237,7 +237,7 @@ app.post("/api/posts/assignment/execute", isLoggedIn, async (req: Request, res: 
             const response = await axios.post(`${ROUTER_URL}/make_submission`, {
                 code,
                 language,
-                test_cases: test_cases.map((test_case: any) => test_case.stdin),
+                test_cases: test_cases.map((test_case: any) => test_case.stdout),
                 input: test_cases.map((test_case: any) => test_case.stdin),
                 replace: test_cases.map((test_case: any) => test_case.replace)
             })

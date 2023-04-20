@@ -237,7 +237,6 @@ export default function Posts() {
                     2000,
                     assingment_index
                 );
-                setSubmissionToken(submission_token);
                 execution_button && (execution_button.disabled = false);
                 execution_result && (execution_result.disabled = false);
                 submit_button && (submit_button.disabled = false);
