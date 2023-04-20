@@ -58,7 +58,7 @@ export interface ICode_Execution_Body {
 }
 
 export interface IAssignment_Code_Execution extends ICode_Execution_Body {
-    index: number;
+    assingment_index: number;
 }
 
 export interface IAssignment_Code_Submission extends IAssignment_Code_Execution {

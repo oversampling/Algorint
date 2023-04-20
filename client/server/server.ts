@@ -227,15 +227,25 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
 })
 
 app.post("/api/posts/assignment/execute", isLoggedIn, async (req: Request, res: Response, next: NextFunction) => {
-    const {code, language} = req.body;
-    const response = await axios.post(`${ROUTER_URL}/make_submission`, {
-        code,
-        language,
-        test_cases: [""],
-        input: [""],
-        replace: [{from: "", to: ""}]
-    })
-    res.json({submission_token: response.data})
+    const {code, language, assignment_id} = req.body;
+    const assignment = await Assignment.findById(assignment_id).populate("test_cases");
+    if (assignment){
+        const test_cases = assignment.test_cases.filter((test_case: any) => test_case.isHidden === true);
+        if (test_cases.length === 0){
+            return res.status(300).json({message: "No sample test cases being set"})
+        }else{
+            const response = await axios.post(`${ROUTER_URL}/make_submission`, {
+                code,
+                language,
+                test_cases: test_cases.map((test_case: any) => test_case.stdin),
+                input: test_cases.map((test_case: any) => test_case.stdin),
+                replace: test_cases.map((test_case: any) => test_case.replace)
+            })
+            return res.json({submission_token: response.data})
+        }
+    }else {
+        throw new ExpressError("Assignment not found", 404)
+    }
 })
 
 app.get("/api/posts/assignment/fetch_result/:submission_token", isLoggedIn,  async (req: Request, res: Response, next: NextFunction) => {

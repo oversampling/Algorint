@@ -42,6 +42,8 @@ export default function Posts() {
         useState<boolean>(false);
     const [submissionToken, setSubmissionToken] = useState<string>("");
     const [showRefreshBtn, setShowRefreshBtn] = useState<boolean>(false);
+    const [showNoSampleTestCases, setShowNoSampleTestCases] =
+        useState<boolean>(false);
     const [executeCode, { isLoading: execution_status }] =
         useExecuteCodeMutation();
     const [fetchExecutionResult, { isLoading: execution_result }] =
@@ -59,7 +61,7 @@ export default function Posts() {
                         const newCodeItem: IAssignment_Code_Execution = {
                             code: payload.assignments[i].code_template,
                             language: payload.assignments[i].language,
-                            index: i,
+                            assingment_index: i,
                         };
                         newCode.push(newCodeItem);
                     }
@@ -199,49 +201,72 @@ export default function Posts() {
         }
     }
     async function handle_execution(assignmentIndex: number) {
+        setShowNoSampleTestCases(false);
         if (assignmentCode) {
-            const { code, language, index }: IAssignment_Code_Execution =
-                assignmentCode[assignmentIndex];
+            const {
+                code,
+                language,
+                assingment_index,
+            }: IAssignment_Code_Execution = assignmentCode[assignmentIndex];
             const submit_button = document.getElementById(
-                `btn-execute-${index}`
+                `btn-execute-${assingment_index}`
             ) as HTMLInputElement;
             const execution_button = document.getElementById(
-                `btn-submit-${index}`
+                `btn-submit-${assingment_index}`
             ) as HTMLInputElement;
             const execution_result = document.getElementById(
-                `execution-result-${index}`
+                `execution-result-${assingment_index}`
             ) as HTMLInputElement;
             execution_result && (execution_result.value = "");
             execution_result && (execution_result.disabled = true);
             execution_button && (execution_button.disabled = true);
             submit_button && (submit_button.disabled = true);
-            const body: ICode_Execution_Body = {
+            const body: IAssignment_Code_Submission = {
                 code: btoa(code),
                 language,
+                assignment_id:
+                    postData?.assignments[assingment_index]._id || "",
+                assingment_index,
             };
-            const data = await executeCode(body).unwrap();
-            const submission_token = data.submission_token;
-            await fetchExecutionResultLoop(20, submission_token, 2000, index);
-            setSubmissionToken(submission_token);
-            execution_button && (execution_button.disabled = false);
-            execution_result && (execution_result.disabled = false);
-            submit_button && (submit_button.disabled = false);
+            try {
+                const data = await executeCode(body).unwrap();
+                const submission_token = data.submission_token;
+                await fetchSubmissionResultLoop(
+                    20,
+                    submission_token,
+                    2000,
+                    assingment_index
+                );
+                setSubmissionToken(submission_token);
+                execution_button && (execution_button.disabled = false);
+                execution_result && (execution_result.disabled = false);
+                submit_button && (submit_button.disabled = false);
+            } catch (error) {
+                setShowNoSampleTestCases(true);
+                execution_button && (execution_button.disabled = false);
+                execution_result && (execution_result.disabled = false);
+                submit_button && (submit_button.disabled = false);
+            }
         }
     }
     async function handle_submit(assignmentIndex: number) {
+        setShowNoSampleTestCases(false);
         if (assignmentCode) {
-            const { code, language, index }: IAssignment_Code_Execution =
-                assignmentCode[assignmentIndex];
-            if (postData?.assignments[index]) {
-                if (postData.assignments[index]._id) {
+            const {
+                code,
+                language,
+                assingment_index,
+            }: IAssignment_Code_Execution = assignmentCode[assignmentIndex];
+            if (postData?.assignments[assingment_index]) {
+                if (postData.assignments[assingment_index]._id) {
                     const submit_button = document.getElementById(
-                        `btn-execute-${index}`
+                        `btn-execute-${assingment_index}`
                     ) as HTMLInputElement;
                     const execution_button = document.getElementById(
-                        `btn-submit-${index}`
+                        `btn-submit-${assingment_index}`
                     ) as HTMLInputElement;
                     const execution_result = document.getElementById(
-                        `execution-result-${index}`
+                        `execution-result-${assingment_index}`
                     ) as HTMLInputElement;
                     execution_result && (execution_result.value = "");
                     execution_result && (execution_result.disabled = true);
@@ -250,8 +275,9 @@ export default function Posts() {
                     const submission: IAssignment_Code_Submission = {
                         code: btoa(code),
                         language,
-                        assignment_id: postData.assignments[index]._id || "",
-                        index,
+                        assignment_id:
+                            postData.assignments[assingment_index]._id || "",
+                        assingment_index,
                     };
                     const response = await submitCode(submission).unwrap();
                     const submission_token: string = response.submission_token;
@@ -260,7 +286,7 @@ export default function Posts() {
                         5,
                         submission_token,
                         2000,
-                        index
+                        assingment_index
                     );
                     execution_button && (execution_button.disabled = false);
                     execution_result && (execution_result.disabled = false);
@@ -416,6 +442,14 @@ export default function Posts() {
                                                             }}
                                                             id={`execution-result-${index}`}
                                                         >
+                                                            {showNoSampleTestCases && (
+                                                                <p>
+                                                                    No Sample
+                                                                    Test Case
+                                                                    Being Set
+                                                                    For Test Run
+                                                                </p>
+                                                            )}
                                                             {showRefreshBtn && (
                                                                 <div>
                                                                     <p>
@@ -549,7 +583,7 @@ export default function Posts() {
                                                                         );
                                                                     }}
                                                                 >
-                                                                    Execute
+                                                                    Test Run
                                                                 </Button>
                                                                 <Button
                                                                     variant="primary"
