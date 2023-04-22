@@ -144,7 +144,7 @@ class Worker():
                 if (status["OOMKilled"] == True):
                     raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
                 else:
-                    time.sleep(0.2) # Wait for the output to be written to the container
+                    time.sleep(0.1) # Wait for the output to be written to the container
                     raise ApplicationError(process, sandbox.output()[1])
             else:
                 return None
@@ -160,7 +160,7 @@ class Worker():
         else:
             raise Exception("Language not supported")
         try:
-            sandbox = Sandbox(self.languages[language], self.dind, command=cmd, timeout=5)
+            sandbox = Sandbox(self.languages[language], self.dind, command=cmd, timeout=2)
             self.identify_error(sandbox, "Compile Time")
             del sandbox
         except ApplicationError as e:
@@ -170,7 +170,7 @@ class Worker():
 
 
     def run_executable(self) -> Sandbox:
-        sandbox = Sandbox("alpine:latest", self.dind, command="./code", timeout=5)
+        sandbox = Sandbox("alpine:latest", self.dind, command="./code", timeout=2)
         # Pass input to stdin
         data = self.read_file(f'{WORK_DIR}/code/input.txt')
         try:
@@ -362,14 +362,13 @@ class Worker():
             channel = connection.channel()
             return channel
         elif (environment == "production"):
-            rabbitmq_url = self.__inject_username_password_to_rabbitmq_url(
-                os.getenv("SUBMISSION_QUEUE").strip())
+            rabbitmq_url = self.__inject_username_password_to_rabbitmq_url(os.getenv("SUBMISSION_QUEUE"), os.getenv("RABBITMQ_USERNAME"), os.getenv("RABBITMQ_PASSWORD")) # missing password parameter
             parameters = pika.URLParameters(rabbitmq_url)
             connection = pika.BlockingConnection(parameters)
             channel = connection.channel()
             return channel
 
-    def __inject_username_password_to_rabbitmq_url(rabbitmq_url, rabbitmq_username, rabbitmq_password):
+    def __inject_username_password_to_rabbitmq_url(self, rabbitmq_url: str, rabbitmq_username: str, rabbitmq_password: str):
         username = rabbitmq_username.strip()
         password = rabbitmq_password.strip()
         rabbitmq_url = rabbitmq_url.replace(

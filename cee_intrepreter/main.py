@@ -141,7 +141,7 @@ class Worker():
                 if (status["OOMKilled"] == True):
                     raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
                 else:
-                    time.sleep(1) # Wait for the output to be written to the container
+                    time.sleep(0.1) # Wait for the output to be written to the container
                     raise ApplicationError(process, sandbox.output()[1])
             else:
                 return None
@@ -326,13 +326,13 @@ class Worker():
             return channel
         elif (environment == "production"):
             rabbitmq_url = self.__inject_username_password_to_rabbitmq_url(
-                os.getenv("SUBMISSION_QUEUE").strip())
+                os.getenv("SUBMISSION_QUEUE").strip(), os.getenv("RABBITMQ_USERNAME").strip(), os.getenv("RABBITMQ_PASSWORD").strip())
             parameters = pika.URLParameters(rabbitmq_url)
             connection = pika.BlockingConnection(parameters)
             channel = connection.channel()
             return channel
 
-    def __inject_username_password_to_rabbitmq_url(rabbitmq_url, rabbitmq_username, rabbitmq_password):
+    def __inject_username_password_to_rabbitmq_url(self, rabbitmq_url: str, rabbitmq_username:str, rabbitmq_password:str):
         username = rabbitmq_username.strip()
         password = rabbitmq_password.strip()
         rabbitmq_url = rabbitmq_url.replace(
