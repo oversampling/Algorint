@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import {
+    Badge,
     Button,
     Card,
-    FloatingLabel,
     Form,
-    OverlayTrigger,
-    Popover,
+    Modal,
     Spinner,
     Stack,
 } from "react-bootstrap";
@@ -35,6 +34,10 @@ export default function Posts() {
     const [assignmentCode, setassignmentCode] = useState<
         IAssignment_Code_Execution[] | undefined
     >();
+    const [showModal, setShowModal] = useState<boolean>(false);
+    const [modalDetails, setModalDetails] = useState<
+        ISubmission_Result | undefined
+    >(undefined);
     const [submissionResult, setSubmissionResult] = useState<
         ISubmission_Result[]
     >([]);
@@ -132,7 +135,7 @@ export default function Posts() {
         max_retries: number,
         submission_token: string,
         ms: number,
-        index: number
+        assignment_index: number
     ): Promise<number> {
         setShowRefreshBtn(false);
         setSubmissionToken("");
@@ -144,7 +147,7 @@ export default function Posts() {
             );
             if (response.status === "done execution") {
                 const textarea = document.getElementById(
-                    `execution-result-${index}`
+                    `execution-result-${assignment_index}`
                 ) as HTMLInputElement;
                 const subResultArray: ISubmission_Result[] = [];
                 if (textarea != null) {
@@ -157,6 +160,10 @@ export default function Posts() {
                             stderr: atob(response.stderr[i]),
                             stdout: atob(response.stdout[i]),
                             result: response.result[i],
+                            replace: response.replace[i],
+                            test_case_input: response.stdin[i],
+                            test_case_output: response.test_cases[i],
+                            assignment_index: assignment_index,
                         };
                         subResultArray.push(subResult);
                     }
@@ -193,6 +200,10 @@ export default function Posts() {
                         stderr: atob(response.stderr[i]),
                         stdout: atob(response.stdout[i]),
                         result: response.result[i],
+                        replace: response.replace[i],
+                        test_case_input: response.stdin[i],
+                        test_case_output: response.test_cases[i],
+                        assignment_index: assingment_index,
                     };
                     subResultArray.push(subResult);
                 }
@@ -293,6 +304,31 @@ export default function Posts() {
                 }
             }
         }
+    }
+    function handle_show_modal(
+        test_case_index: number,
+        result: boolean,
+        stdout: string,
+        stderr: string,
+        test_case_output: string,
+        test_case_input: string,
+        replace: { from: string; to: string }[]
+    ) {
+        setShowModal(true);
+        const submission_result: ISubmission_Result = {
+            result,
+            stdout,
+            stderr,
+            test_case_output,
+            test_case_input,
+            replace: replace,
+            test_case_index,
+        };
+        setModalDetails(submission_result);
+    }
+    function handle_close_modal() {
+        setModalDetails(undefined);
+        setShowModal(false);
     }
     return (
         <div>
@@ -494,71 +530,51 @@ export default function Posts() {
                                                                 ? submissionResult.map(
                                                                       (
                                                                           result,
-                                                                          index
+                                                                          test_case_index
                                                                       ) => {
                                                                           return (
-                                                                              <OverlayTrigger
-                                                                                  trigger="click"
+                                                                              <div
                                                                                   key={
-                                                                                      index
+                                                                                      test_case_index
                                                                                   }
-                                                                                  placement="top"
-                                                                                  overlay={
-                                                                                      <Popover
-                                                                                          id={`popover-positioned-${index}`}
-                                                                                      >
-                                                                                          <Popover.Header as="h3">
-                                                                                              Test
-                                                                                              Case{" "}
-                                                                                              {index +
-                                                                                                  1}
-                                                                                          </Popover.Header>
-                                                                                          <Popover.Body>
-                                                                                              <div>
-                                                                                                  <strong>
-                                                                                                      {result[
-                                                                                                          "stdout"
-                                                                                                      ] !==
-                                                                                                      ""
-                                                                                                          ? "STDOUT"
-                                                                                                          : "STDERR"}
-                                                                                                  </strong>
-                                                                                              </div>
-                                                                                              <span>
-                                                                                                  {result[
-                                                                                                      "stdout"
-                                                                                                  ] !==
-                                                                                                  ""
-                                                                                                      ? result.stdout
-                                                                                                      : result.stderr}
-                                                                                              </span>
-                                                                                          </Popover.Body>
-                                                                                      </Popover>
-                                                                                  }
+                                                                                  className="mb-1"
                                                                               >
-                                                                                  <div className="d-flex my-1 align-items-center">
-                                                                                      <p className="my-auto">
-                                                                                          Test
-                                                                                          Case{" "}
-                                                                                          {index +
-                                                                                              1}
+                                                                                  <span className="mx-2">
+                                                                                      Test
+                                                                                      Case{" "}
+                                                                                      {test_case_index +
+                                                                                          1}
 
-                                                                                          :
-                                                                                      </p>
-                                                                                      <Button
-                                                                                          className="mx-1"
-                                                                                          variant={
-                                                                                              result.result
-                                                                                                  ? "success"
-                                                                                                  : "danger"
-                                                                                          }
-                                                                                      >
-                                                                                          {result.result
-                                                                                              ? "PASS"
-                                                                                              : "FAIL"}
-                                                                                      </Button>
-                                                                                  </div>
-                                                                              </OverlayTrigger>
+                                                                                      :
+                                                                                  </span>
+                                                                                  <Button
+                                                                                      variant={
+                                                                                          result.result
+                                                                                              ? "success"
+                                                                                              : "danger"
+                                                                                      }
+                                                                                      onClick={() => {
+                                                                                          handle_show_modal(
+                                                                                              test_case_index,
+                                                                                              result.result,
+                                                                                              result.stdout,
+                                                                                              result.stderr,
+                                                                                              result.test_case_output,
+                                                                                              result.test_case_input,
+                                                                                              result.replace
+                                                                                          );
+                                                                                          console.log(
+                                                                                              result
+                                                                                                  .replace[0]
+                                                                                                  .from
+                                                                                          );
+                                                                                      }}
+                                                                                  >
+                                                                                      {result.result
+                                                                                          ? "Pass"
+                                                                                          : "Failed"}
+                                                                                  </Button>
+                                                                              </div>
                                                                           );
                                                                       }
                                                                   )
@@ -612,6 +628,138 @@ export default function Posts() {
                             )
                         )}
                     </div>
+                    <Modal
+                        show={showModal}
+                        onHide={handle_close_modal}
+                        scrollable={true}
+                    >
+                        <Modal.Header closeButton>
+                            <Modal.Title>
+                                <span>
+                                    Test Case{" "}
+                                    {modalDetails?.test_case_index !==
+                                        undefined &&
+                                        (modalDetails?.test_case_index === 0
+                                            ? 1
+                                            : modalDetails?.test_case_index +
+                                              1)}
+                                    <Badge
+                                        bg={
+                                            modalDetails && modalDetails.result
+                                                ? "success"
+                                                : "danger"
+                                        }
+                                        style={{ fontSize: "0.8rem" }}
+                                    >
+                                        {modalDetails && modalDetails.result
+                                            ? " Passed"
+                                            : " Failed"}
+                                    </Badge>
+                                </span>
+                            </Modal.Title>
+                        </Modal.Header>
+                        <Modal.Body>
+                            <Form>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>
+                                        {modalDetails &&
+                                        modalDetails.stdout !== ""
+                                            ? "Stdout"
+                                            : "Stderr"}
+                                    </Form.Label>
+                                    <Form.Control
+                                        as="textarea"
+                                        placeholder=""
+                                        value={
+                                            modalDetails &&
+                                            (modalDetails.stdout !== ""
+                                                ? modalDetails.stdout
+                                                : modalDetails.stderr)
+                                        }
+                                        readOnly
+                                    />
+                                </Form.Group>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Expected Output</Form.Label>
+                                    <Form.Control
+                                        as="textarea"
+                                        placeholder=""
+                                        value={
+                                            modalDetails &&
+                                            atob(modalDetails.test_case_output)
+                                        }
+                                        readOnly
+                                    />
+                                </Form.Group>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Stdin</Form.Label>
+                                    <Form.Control
+                                        as="textarea"
+                                        placeholder=""
+                                        value={
+                                            modalDetails &&
+                                            atob(modalDetails.test_case_input)
+                                        }
+                                        readOnly
+                                    />
+                                </Form.Group>
+                                <div className="container">
+                                    {modalDetails &&
+                                        modalDetails.replace.map(
+                                            (modalDetail, modalDetailIndex) => {
+                                                return (
+                                                    <div
+                                                        className="row"
+                                                        key={modalDetailIndex}
+                                                    >
+                                                        <div className="col">
+                                                            <Form.Group className="mb-3">
+                                                                <Form.Label>
+                                                                    Replace
+                                                                    Value From
+                                                                </Form.Label>
+                                                                <Form.Control
+                                                                    as="textarea"
+                                                                    placeholder=""
+                                                                    value={atob(
+                                                                        modalDetail.from
+                                                                    )}
+                                                                    readOnly
+                                                                />
+                                                            </Form.Group>
+                                                        </div>
+                                                        <div className="col">
+                                                            <Form.Group className="mb-3">
+                                                                <Form.Label>
+                                                                    Replace
+                                                                    Value to
+                                                                </Form.Label>
+                                                                <Form.Control
+                                                                    as="textarea"
+                                                                    placeholder=""
+                                                                    value={atob(
+                                                                        modalDetail.to
+                                                                    )}
+                                                                    readOnly
+                                                                />
+                                                            </Form.Group>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                        )}
+                                </div>
+                            </Form>
+                        </Modal.Body>
+                        <Modal.Footer>
+                            <Button
+                                variant="secondary"
+                                onClick={handle_close_modal}
+                            >
+                                Close
+                            </Button>
+                        </Modal.Footer>
+                    </Modal>
                 </div>
             </div>
         </div>

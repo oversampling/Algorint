@@ -69,4 +69,12 @@ export interface ISubmission_Result {
     stderr: string;
     stdout: string;
     result: boolean;
+    replace: {
+        from: string;
+        to: string;
+    }[];
+    test_case_input: string;
+    test_case_output: string;
+    test_case_index?: number;
+    assignment_index?: number;
 }
