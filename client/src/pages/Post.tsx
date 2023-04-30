@@ -21,7 +21,6 @@ import {
 import {
     IAssignment_Code_Execution,
     IAssignment_Code_Submission,
-    ICode_Execution_Body,
     ISubmission_Result,
     Post,
 } from "../interface";
@@ -39,14 +38,14 @@ export default function Posts() {
         ISubmission_Result | undefined
     >(undefined);
     const [submissionResult, setSubmissionResult] = useState<
-        ISubmission_Result[]
+        ISubmission_Result[][]
     >([]);
-    const [showRefreshSpinner, setShowRefreshSpinner] =
-        useState<boolean>(false);
-    const [submissionToken, setSubmissionToken] = useState<string>("");
-    const [showRefreshBtn, setShowRefreshBtn] = useState<boolean>(false);
-    const [showNoSampleTestCases, setShowNoSampleTestCases] =
-        useState<boolean>(false);
+    const [showRefreshSpinner, setShowRefreshSpinner] = useState<boolean[]>([]);
+    const [submissionToken, setSubmissionToken] = useState<string[]>([]);
+    const [showRefreshBtn, setShowRefreshBtn] = useState<boolean[]>([]);
+    const [showNoSampleTestCases, setShowNoSampleTestCases] = useState<
+        boolean[]
+    >([]);
     const [executeCode, { isLoading: execution_status }] =
         useExecuteCodeMutation();
     const [fetchExecutionResult, { isLoading: execution_result }] =
@@ -57,8 +56,40 @@ export default function Posts() {
         async function viewPostData() {
             setIsLoading(true);
             const payload: Post = await viewPost(id || "").unwrap();
+            setSubmissionResult([]);
+            setShowRefreshSpinner([]);
+            setShowRefreshBtn([]);
+            setShowNoSampleTestCases([]);
             if (payload) {
                 if (payload.assignments.length > 0) {
+                    setSubmissionResult((prev) => {
+                        const newSubmissionResult = [...prev];
+                        for (let i = 0; i < payload.assignments.length; i++) {
+                            newSubmissionResult.push([]);
+                        }
+                        return newSubmissionResult;
+                    });
+                    setShowRefreshSpinner((prev) => {
+                        const newShowRefreshSpinner = [...prev];
+                        for (let i = 0; i < payload.assignments.length; i++) {
+                            newShowRefreshSpinner.push(false);
+                        }
+                        return newShowRefreshSpinner;
+                    });
+                    setShowRefreshBtn((prev) => {
+                        const newShowRefreshBtn = [...prev];
+                        for (let i = 0; i < payload.assignments.length; i++) {
+                            newShowRefreshBtn.push(false);
+                        }
+                        return newShowRefreshBtn;
+                    });
+                    setShowNoSampleTestCases((prev) => {
+                        const newShowNoSampleTestCases = [...prev];
+                        for (let i = 0; i < payload.assignments.length; i++) {
+                            newShowNoSampleTestCases.push(false);
+                        }
+                        return newShowNoSampleTestCases;
+                    });
                     const newCode: IAssignment_Code_Execution[] = [];
                     for (let i = 0; i < payload.assignments.length; i++) {
                         const newCodeItem: IAssignment_Code_Execution = {
@@ -103,43 +134,27 @@ export default function Posts() {
         await timeout(ms);
         return await fetchExecutionResult(submission_token).unwrap();
     }
-    async function fetchExecutionResultLoop(
-        max_retries: number,
-        submission_token: string,
-        ms: number,
-        index: number
-    ): Promise<number> {
-        setSubmissionResult([]);
-        for (let i = 0; i < max_retries; i++) {
-            const response = await fetchExecutionResultWithSleep(
-                submission_token,
-                ms
-            );
-            if (response.status === "done execution") {
-                const textarea = document.getElementById(
-                    `execution-result-${index}`
-                ) as HTMLInputElement;
-                if (textarea != null) {
-                    if (response.stdout[0] != "") {
-                        textarea.innerText = atob(response.stdout[0]);
-                    } else {
-                        textarea.innerText = atob(response.stderr[0]);
-                    }
-                }
-                return 0;
-            }
-        }
-        return -1;
-    }
     async function fetchSubmissionResultLoop(
         max_retries: number,
         submission_token: string,
         ms: number,
         assignment_index: number
     ): Promise<number> {
-        setShowRefreshBtn(false);
-        setSubmissionToken("");
-        setSubmissionResult([]);
+        setShowRefreshBtn((prev) => {
+            const newShowRefreshBtn = [...prev];
+            newShowRefreshBtn[assignment_index] = false;
+            return newShowRefreshBtn;
+        });
+        setSubmissionToken((prev) => {
+            const newSubmissionToken = [...prev];
+            newSubmissionToken[assignment_index] = submission_token;
+            return newSubmissionToken;
+        });
+        setSubmissionResult((prev) => {
+            const newSubmissionResult = [...prev];
+            newSubmissionResult[assignment_index] = [];
+            return newSubmissionResult;
+        });
         for (let i = 0; i < max_retries; i++) {
             const response = await fetchExecutionResultWithSleep(
                 submission_token,
@@ -151,11 +166,7 @@ export default function Posts() {
                 ) as HTMLInputElement;
                 const subResultArray: ISubmission_Result[] = [];
                 if (textarea != null) {
-                    let result: string = "";
                     for (let i = 0; i < response.stdout.length; i++) {
-                        result += `Test Case ${i + 1} : ${
-                            response.result[i] ? "Passed" : "Failed"
-                        }\n`;
                         const subResult: ISubmission_Result = {
                             stderr: atob(response.stderr[i]),
                             stdout: atob(response.stdout[i]),
@@ -167,52 +178,76 @@ export default function Posts() {
                         };
                         subResultArray.push(subResult);
                     }
-                    setSubmissionResult(subResultArray);
+                    setSubmissionResult((prev) => {
+                        const newSubmissionResult = [...prev];
+                        newSubmissionResult[assignment_index] = subResultArray;
+                        return newSubmissionResult;
+                    });
+                    setSubmissionToken((prev) => {
+                        const newSubmissionToken = [...prev];
+                        newSubmissionToken[assignment_index] = "";
+                        return newSubmissionToken;
+                    });
                 }
                 return 0;
             }
         }
-        setSubmissionToken(submission_token);
-        setShowRefreshBtn(true);
+        setShowRefreshBtn((prev) => {
+            const newShowRefreshBtn = [...prev];
+            newShowRefreshBtn[assignment_index] = true;
+            return newShowRefreshBtn;
+        });
         return -1;
     }
     async function refreshSubmissionResultClick(assingment_index: number) {
-        setShowRefreshSpinner(true);
+        setShowRefreshSpinner((prev) => {
+            const newShowRefreshSpinner = [...prev];
+            newShowRefreshSpinner[assingment_index] = true;
+            return newShowRefreshSpinner;
+        });
+        // TODO: wrap fetchExecutionResult with try catch
         const response = await fetchExecutionResultWithSleep(
-            submissionToken,
+            submissionToken[assingment_index],
             0
         );
         await timeout(1000);
-        setShowRefreshSpinner(false);
+        setShowRefreshSpinner((prev) => {
+            const newShowRefreshSpinner = [...prev];
+            newShowRefreshSpinner[assingment_index] = false;
+            return newShowRefreshSpinner;
+        });
         if (response.status === "done execution") {
-            setShowRefreshBtn(false);
-            const textarea = document.getElementById(
-                `execution-result-${assingment_index}`
-            ) as HTMLInputElement;
+            setShowRefreshBtn((prev) => {
+                const newShowRefreshBtn = [...prev];
+                newShowRefreshBtn[assingment_index] = false;
+                return newShowRefreshBtn;
+            });
             const subResultArray: ISubmission_Result[] = [];
-            if (textarea != null) {
-                let result: string = "";
-                for (let i = 0; i < response.stdout.length; i++) {
-                    result += `Test Case ${i + 1} : ${
-                        response.result[i] ? "Passed" : "Failed"
-                    }\n`;
-                    const subResult: ISubmission_Result = {
-                        stderr: atob(response.stderr[i]),
-                        stdout: atob(response.stdout[i]),
-                        result: response.result[i],
-                        replace: response.replace[i],
-                        test_case_input: response.stdin[i],
-                        test_case_output: response.test_cases[i],
-                        assignment_index: assingment_index,
-                    };
-                    subResultArray.push(subResult);
-                }
-                setSubmissionResult(subResultArray);
+            for (let i = 0; i < response.stdout.length; i++) {
+                const subResult: ISubmission_Result = {
+                    stderr: atob(response.stderr[i]),
+                    stdout: atob(response.stdout[i]),
+                    result: response.result[i],
+                    replace: response.replace[i],
+                    test_case_input: response.stdin[i],
+                    test_case_output: response.test_cases[i],
+                    assignment_index: assingment_index,
+                };
+                subResultArray.push(subResult);
             }
+            setSubmissionResult((prev) => {
+                const newSubmissionResult = [...prev];
+                newSubmissionResult[assingment_index] = subResultArray;
+                return newSubmissionResult;
+            });
         }
     }
     async function handle_execution(assignmentIndex: number) {
-        setShowNoSampleTestCases(false);
+        setShowNoSampleTestCases((prev) => {
+            const newShowNoSampleTestCases = [...prev];
+            newShowNoSampleTestCases[assignmentIndex] = false;
+            return newShowNoSampleTestCases;
+        });
         if (assignmentCode) {
             const {
                 code,
@@ -243,7 +278,7 @@ export default function Posts() {
                 const data = await executeCode(body).unwrap();
                 const submission_token = data.submission_token;
                 await fetchSubmissionResultLoop(
-                    20,
+                    5,
                     submission_token,
                     2000,
                     assingment_index
@@ -252,7 +287,11 @@ export default function Posts() {
                 execution_result && (execution_result.disabled = false);
                 submit_button && (submit_button.disabled = false);
             } catch (error) {
-                setShowNoSampleTestCases(true);
+                setShowNoSampleTestCases((prev) => {
+                    const newShowNoSampleTestCases = [...prev];
+                    newShowNoSampleTestCases[assignmentIndex] = true;
+                    return newShowNoSampleTestCases;
+                });
                 execution_button && (execution_button.disabled = false);
                 execution_result && (execution_result.disabled = false);
                 submit_button && (submit_button.disabled = false);
@@ -260,7 +299,11 @@ export default function Posts() {
         }
     }
     async function handle_submit(assignmentIndex: number) {
-        setShowNoSampleTestCases(false);
+        setShowNoSampleTestCases((prev) => {
+            const newShowNoSampleTestCases = [...prev];
+            newShowNoSampleTestCases[assignmentIndex] = false;
+            return newShowNoSampleTestCases;
+        });
         if (assignmentCode) {
             const {
                 code,
@@ -291,7 +334,6 @@ export default function Posts() {
                     };
                     const response = await submitCode(submission).unwrap();
                     const submission_token: string = response.submission_token;
-                    console.log(submission_token);
                     await fetchSubmissionResultLoop(
                         5,
                         submission_token,
@@ -477,7 +519,9 @@ export default function Posts() {
                                                             }}
                                                             id={`execution-result-${index}`}
                                                         >
-                                                            {showNoSampleTestCases && (
+                                                            {showNoSampleTestCases[
+                                                                index
+                                                            ] && (
                                                                 <p>
                                                                     No Sample
                                                                     Test Case
@@ -485,7 +529,9 @@ export default function Posts() {
                                                                     For Test Run
                                                                 </p>
                                                             )}
-                                                            {showRefreshBtn && (
+                                                            {showRefreshBtn[
+                                                                index
+                                                            ] && (
                                                                 <div>
                                                                     <p>
                                                                         <i>
@@ -515,7 +561,9 @@ export default function Posts() {
                                                                         >
                                                                             Refresh
                                                                         </Button>
-                                                                        {showRefreshSpinner && (
+                                                                        {showRefreshSpinner[
+                                                                            index
+                                                                        ] && (
                                                                             <Spinner
                                                                                 animation="border"
                                                                                 variant="info"
@@ -525,9 +573,12 @@ export default function Posts() {
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            {submissionResult.length !==
-                                                            0
-                                                                ? submissionResult.map(
+                                                            {submissionResult[
+                                                                index
+                                                            ].length !== 0
+                                                                ? submissionResult[
+                                                                      index
+                                                                  ].map(
                                                                       (
                                                                           result,
                                                                           test_case_index
@@ -562,11 +613,6 @@ export default function Posts() {
                                                                                               result.test_case_output,
                                                                                               result.test_case_input,
                                                                                               result.replace
-                                                                                          );
-                                                                                          console.log(
-                                                                                              result
-                                                                                                  .replace[0]
-                                                                                                  .from
                                                                                           );
                                                                                       }}
                                                                                   >
