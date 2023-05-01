@@ -419,7 +419,7 @@ export default function EditPost() {
                                                             <Markdown
                                                                 index={index}
                                                                 value={
-                                                                    assignment.question.trim() ||
+                                                                    assignment.question ||
                                                                     ""
                                                                 }
                                                                 onChange={
