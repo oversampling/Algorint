@@ -184,7 +184,7 @@ export default function New() {
         }
         // Encode data to base64
         post.description = btoa(post.description);
-        post.title = btoa(post.title);
+        post.title = post.title;
         for (let i = 0; i < post.assignments.length; i++) {
             post.assignments[i].question = btoa(post.assignments[i].question);
             post.assignments[i].code_template = btoa(

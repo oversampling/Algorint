@@ -38,7 +38,7 @@ export default function PostList({
                                     <Stack direction="horizontal">
                                         <div>
                                             <span className="fw-light fs-4">
-                                                {atob(post.title)}
+                                                {post.title}
                                             </span>
                                             {post.assignments.length > 0 && (
                                                 <Badge
