@@ -35,9 +35,6 @@ export default function Posts({ posts }: { posts?: Post[] }) {
                                     data && <PostList posts={data} />
                                 )}
                             </Tab>
-                            <Tab eventKey="Assignments" title="Assignments">
-                                <div>Under Development</div>
-                            </Tab>
                         </Tabs>
                         <Link
                             to="/posts/new"

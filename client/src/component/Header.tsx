@@ -78,7 +78,7 @@ export default function Header() {
     return (
         <Navbar bg="light" expand="lg" className="shadow-sm bg-body rounded">
             <Container fluid>
-                <Navbar.Brand href="#">UTAR Open Source</Navbar.Brand>
+                <Navbar.Brand href="/">Automatic Marking System</Navbar.Brand>
                 <Navbar.Toggle aria-controls="navbarScroll" />
                 <Navbar.Collapse id="navbarScroll">
                     <Nav
@@ -86,7 +86,7 @@ export default function Header() {
                         style={{ maxHeight: "100px" }}
                         navbarScroll
                     >
-                        {token ? (
+                        {token && (
                             <Nav.Link
                                 onClick={() => {
                                     navigate("/posts");
@@ -94,8 +94,6 @@ export default function Header() {
                             >
                                 Home
                             </Nav.Link>
-                        ) : (
-                            <Nav.Link href="/about">About</Nav.Link>
                         )}
                     </Nav>
                     <Form className="d-flex" onSubmit={onSearchSubmit}>
