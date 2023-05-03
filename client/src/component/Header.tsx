@@ -5,7 +5,8 @@ import Form from "react-bootstrap/Form";
 import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
 import { useNavigate } from "react-router-dom";
-import { useGoogleLogin } from "@react-oauth/google";
+import { GoogleLogin, useGoogleLogin } from "@react-oauth/google";
+import "./gLogin.css";
 import {
     Figure,
     ListGroup,
@@ -227,7 +228,26 @@ export default function Header() {
                             </Stack>
                         ) : (
                             <Stack direction="horizontal" gap={1}>
-                                <Button onClick={googleLogin}>Login</Button>
+                                <div id="gSignInWrapper">
+                                    <span
+                                        className="label"
+                                        style={{ marginRight: "5px" }}
+                                    >
+                                        Sign in with:
+                                    </span>
+                                    <div
+                                        id="customBtn"
+                                        className="customGPlusSignIn"
+                                    >
+                                        <span className="icon"></span>
+                                        <span
+                                            className="buttonText"
+                                            onClick={googleLogin}
+                                        >
+                                            Google
+                                        </span>
+                                    </div>
+                                </div>
                             </Stack>
                         )}
                     </Form>
