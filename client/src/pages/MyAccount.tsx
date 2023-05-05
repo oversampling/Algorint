@@ -35,9 +35,6 @@ export default function MyAccount() {
                                     />
                                 )}
                             </Tab>
-                            <Tab eventKey="Assignments" title="My Assignments">
-                                <div>Under Development</div>
-                            </Tab>
                         </Tabs>
                         <Link
                             to="/posts/new"

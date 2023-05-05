@@ -145,7 +145,7 @@ app.get("/api/posts", isLoggedIn ,async (req: Request<{}, {}, IRequestQuery_Post
                 }}).sort({stars: options.sort.stars === "ASC" ? 1 : -1})
                 .sort({publishDate: options.sort.publishDate === "ASC" ? 1 : -1})
                 .limit(options.limit).skip((options.page - 1) * options.limit)
-                res.status(200).json(posts)
+            return res.status(200).json(posts)
         }else{
             const posts = await Post.find({isPublic: true}).populate("assignments").populate({
                 path: "assignments",
@@ -155,7 +155,7 @@ app.get("/api/posts", isLoggedIn ,async (req: Request<{}, {}, IRequestQuery_Post
             }).sort({stars: options.sort.stars === "ASC" ? 1 : -1})
             .sort({publishDate: options.sort.publishDate === "ASC" ? 1 : -1})
             .limit(options.limit).skip((options.page - 1) * options.limit)
-            res.status(200).json(posts)
+            return res.status(200).json(posts)
         }
     } catch (error) {
         next(error)
@@ -409,7 +409,7 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
 })
 
 app.all("*", (req: Request, res:Response, next: NextFunction) => {
-    next(new ExpressError("Page not found", 404))
+    return res.redirect("/")
 })
 
 app.use((err: ExpressError, req: Request, res: Response, next: NextFunction) => {

@@ -95,7 +95,7 @@ export default function EditPost() {
                 }
                 const post: Post = {
                     _id: newData._id,
-                    title: atob(newData.title || ""),
+                    title: newData.title || "",
                     description: atob(newData.description || ""),
                     isPublic: newData.isPublic || false,
                     assignments: newData.assignments || [],
@@ -270,7 +270,7 @@ export default function EditPost() {
         // Encode data to base64
         const postToUpdate: Post = { ...post };
         postToUpdate.description = btoa(post.description);
-        postToUpdate.title = btoa(post.title);
+        postToUpdate.title = post.title;
         const assingmentListToUpdate: Assignment[] = [...assingmentList];
         for (let i = 0; i < assingmentListToUpdate.length; i++) {
             assingmentListToUpdate[i].question = btoa(

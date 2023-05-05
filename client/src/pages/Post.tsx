@@ -399,7 +399,7 @@ export default function Posts() {
                                 <Card className="shadow-sm bg-body rounded border-0">
                                     <Card.Header>
                                         <Stack direction="horizontal" gap={3}>
-                                            <div>{atob(postData["title"])}</div>
+                                            <div>{postData["title"]}</div>
                                             <div className="ms-auto">
                                                 {postData["stars"]}
                                                 <span className="mx-1">

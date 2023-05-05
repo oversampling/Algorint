@@ -11,11 +11,20 @@ export default function Home() {
                 <div className="container" style={{ marginTop: "80px" }}>
                     <div className="row justify-content-center">
                         <div className="col-7">
-                            <h1 className="text-center m-3">
-                                Computer Science and Information System
-                                Community
+                            <h1 className="">
+                                Tutorial and Learning Platform With Automatic
+                                Marking Capability
                             </h1>
-                            <div className="d-flex justify-content-center">
+                            <p className="">
+                                A tutorial and learning platform with automatic
+                                marking capability is an educational tool that
+                                combines online course content with automated
+                                assessment and feedback capabilities. This
+                                platform is designed to provide a more efficient
+                                and effective learning experience for students,
+                                instructors, and educators alike.
+                            </p>
+                            <div className="">
                                 <Button
                                     onClick={() => {
                                         navigate("/posts");
@@ -31,23 +40,21 @@ export default function Home() {
                     <div className="container">
                         <div className="row">
                             <div className="col-8">
-                                <h2 className="my-3">
-                                    Data Structure And Algorithms
-                                </h2>
-                                UTAR Open Source is an open source foundation
-                                dedicated to teaching data structures and
-                                algorithms to students and developers of all
-                                levels. We believe that understanding
-                                fundamental concepts like data structures and
-                                algorithms is essential for becoming a skilled
-                                programmer, and we strive to make this knowledge
-                                accessible to everyone.
-                                <h2 className="my-3">Software Development</h2>
-                                Our mission is to make software development
-                                education accessible to anyone with an internet
-                                connection. We believe that the ability to write
-                                code is a valuable skill that can transform
-                                lives and open up new opportunities.
+                                <h2 className="my-3">Effective Learning</h2>
+                                The platform provide interactive and engaging
+                                content that is designed to keep students
+                                motivated and focused.The platform should be
+                                designed to provide a personalized learning
+                                experience, tailored to the individual needs and
+                                learning styles of each student.
+                                <h2 className="my-3">Flexible</h2>
+                                Students can access the platform at any time,
+                                from anywhere with an internet connection,
+                                allowing them to learn at their own pace and on
+                                their own schedule. The platform also provides a
+                                range of assessment and feedback tools, allowing
+                                students to test their understanding of the
+                                material and receive feedback on their progress.
                             </div>
                             <div className="col-4">
                                 <h2>Recent News</h2>
