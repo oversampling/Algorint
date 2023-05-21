@@ -13,3 +13,7 @@ variable "rabbitmq-password" {
   type    = string
   default = "algorint-rabbitmq-password-21012023"
 }
+
+variable "GOOGLE_CLIENT_SECRET" {
+  type = string
+}

@@ -28,3 +28,19 @@ resource "aws_security_group" "algorint-rabbitmq" {
     ]
   }
 }
+
+resource "aws_security_group" "algorint-mongodb" {
+  name   = "algorint-mongodb"
+  vpc_id = module.vpc.vpc_id
+
+  ingress {
+    from_port = 27017
+    to_port   = 27017
+    protocol  = "tcp"
+
+    cidr_blocks = [
+      "10.0.1.0/24",
+      "10.0.2.0/24",
+    ]
+  }
+}

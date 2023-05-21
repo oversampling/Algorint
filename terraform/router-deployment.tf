@@ -14,6 +14,7 @@ resource "kubernetes_config_map" "router" {
   }
   data = {
     CEE_INTERPRETER_QUEUE_NAME = "cee-intrepreter-queue"
+    CEE_COMPILER_QUEUE_NAME    = "cee-compiler-queue"
     ENVIRONMENT                = "production"
   }
   depends_on = [
@@ -68,17 +69,17 @@ resource "kubernetes_deployment" "router" {
           "hostname" = "node1"
         }
         container {
-          image             = "chan1992241/router"
+          image             = "chan1992241/router:latest"
           name              = "router-app"
           image_pull_policy = "Always"
           resources {
             limits = {
               cpu    = "0.5"
-              memory = "512Mi"
+              memory = "200Mi"
             }
             requests = {
               cpu    = "0.5"
-              memory = "512Mi"
+              memory = "200Mi"
             }
           }
           env_from {
@@ -123,7 +124,7 @@ resource "kubernetes_service" "router" {
       target_port = 8080
       protocol    = "TCP"
     }
-    type = "LoadBalancer"
+    type = "ClusterIP"
   }
   depends_on = [
     kubernetes_config_map.router

@@ -33,7 +33,12 @@ output "rabbitmq_console_url" {
   value       = aws_mq_broker.algorint-rabbitmq.instances[0].console_url
 }
 
+output "mongodb_endpoint" {
+  description = "MongoDB endpoint"
+  value       = aws_docdb_cluster.algorint.endpoint
+}
+
 output "router-loadbalancer-dns" {
   description = "Router loadbalancer DNS"
-  value       = kubernetes_service.router.status.0.load_balancer.0.ingress.0.hostname
+  value       = kubernetes_service.client.status.0.load_balancer.0.ingress
 }
