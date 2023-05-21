@@ -146,11 +146,11 @@ class Worker():
             else:
                 return None
 
-    def __execute(self, language: Literal["python", "nodejs"]) -> tuple[str, str]:
+    def __execute(self, language: Literal["python", "nodejs"], timeout: int = 2, mem_limit: str = "100m", pids_limit: int = 500) -> tuple[str, str]:
         if (language == "python"):
-            sandbox = Sandbox(self.languages[language], self.dind, command="python code.py", timeout=2)
+            sandbox = Sandbox(self.languages[language], self.dind, command="python code.py", timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
         elif (language == "nodejs"):
-            sandbox = Sandbox(self.languages[language], self.dind, command="node code.js", timeout=2)
+            sandbox = Sandbox(self.languages[language], self.dind, command="node code.js", timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
         else:
             raise Exception("Language not supported")
         data = self.read_file(f'{self.workdir}/code/input.txt')
@@ -159,9 +159,9 @@ class Worker():
                 sandbox.write(data + "\n")
             self.identify_error(sandbox, "Run Time")
         except ApplicationError as e:
-            return "", str(e)
+            return "", f"Run Time Error\n{str(e)}"
         except Exception as e:
-            return "", str(e)
+            return "", f"Run Time Error\n{str(e)}"
         stdout, stderr = sandbox.output()
         del sandbox
         return stdout, stderr
@@ -291,7 +291,7 @@ class Worker():
     def __dind(self) -> docker.DockerClient:
         max_retries = 4
         count = 0
-        backoffSeconds = 2
+        backoffSeconds = 10
         while True:
             try:
                 dind = docker.from_env()

@@ -150,7 +150,7 @@ class Worker():
                 return None
 
 
-    def compile(self, language: str):
+    def compile(self, language: str, timeout: int = 2, mem_limit: str = "100m", pids_limit: int = 500):
         if (language == "cpp"):
             cmd = "c++ --static code.cpp -o code"
         elif (language == "c"):
@@ -160,7 +160,7 @@ class Worker():
         else:
             raise Exception("Language not supported")
         try:
-            sandbox = Sandbox(self.languages[language], self.dind, command=cmd, timeout=2)
+            sandbox = Sandbox(self.languages[language], self.dind, command=cmd, timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
             self.identify_error(sandbox, "Compile Time")
             del sandbox
         except ApplicationError as e:
@@ -169,8 +169,8 @@ class Worker():
             raise Exception(e)
 
 
-    def run_executable(self) -> Sandbox:
-        sandbox = Sandbox("alpine:latest", self.dind, command="./code", timeout=2)
+    def run_executable(self, timeout: int = 2, mem_limit: str = "100m", pids_limit: int = 500):
+        sandbox = Sandbox("alpine:latest", self.dind, command="./code", timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
         # Pass input to stdin
         data = self.read_file(f'{WORK_DIR}/code/input.txt')
         try:
@@ -188,12 +188,12 @@ class Worker():
 
     def __execute(self, language) -> tuple[str, str]:
         try:
-            self.compile(language)
+            self.compile(language, timeout=5, mem_limit="100m", pids_limit=500)
         except ApplicationError as e:
-            return "", str(e)
+            return "", f"Compile Time Error\n{str(e)}"
         except Exception as e:
             # Compile error
-            return "", e.__str__()
+            return "", f"Compile Time Error\n{str(e)}"
         else:
             stdout, stderr = self.run_executable()
             return stdout, stderr
@@ -329,7 +329,7 @@ class Worker():
     def __dind(self) -> docker.DockerClient:
         max_retries = 4
         count = 0
-        backoffSeconds = 2
+        backoffSeconds = 10
         while True:
             try:
                 dind = docker.from_env()
