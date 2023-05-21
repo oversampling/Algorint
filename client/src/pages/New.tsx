@@ -626,7 +626,6 @@ export default function New() {
                     </div>
                 </div>
             </div>
-            <div>{JSON.stringify(post)}</div>
         </div>
     );
 }

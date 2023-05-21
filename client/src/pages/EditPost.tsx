@@ -759,7 +759,6 @@ export default function EditPost() {
                     </div>
                 </div>
             </div>
-            <div>{JSON.stringify(post)}</div>
         </div>
     );
 }
