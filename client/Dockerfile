@@ -37,4 +37,6 @@ COPY --from=builder /app/dist dist
 
 WORKDIR /app/server
 
+RUN wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
+
 CMD ["npm", "run", "start"]

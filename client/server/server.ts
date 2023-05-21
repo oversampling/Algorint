@@ -21,8 +21,22 @@ const oAuth2Client = new OAuth2Client(
   );
 
 const app: Express = express();
-mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/algorint")
-  .then(() => console.log('Mongodb Connected'));
+let mongo_uri = ""
+if (!process.env.MONGO_USER) {
+    mongo_uri = process.env.MONGO_URI || "mongodb://localhost:27017/algorint"
+    mongoose.connect(mongo_uri).then(() => console.log('Mongodb Connected'));
+}else{
+    mongo_uri = `mongodb://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_URI}:27017/algorint`
+    mongoose.connect(mongo_uri, {
+        ssl: true,
+        retryWrites: false,
+        replicaSet: 'rs0',
+        readPreference: 'secondaryPreferred',
+        sslValidate: true,
+        sslCA: `./rds-combined-ca-bundle.pem`
+    }).then(() => console.log('Mongodb Connected'));
+}
+
 
 app.use(cors({origin: ["http://localhost:5173", "https://www.chanjinyee.online"], credentials: true}))
 app.use(express.json())
