@@ -35,21 +35,49 @@ spec:
         app: cee-intrepreter
     spec:
       containers:
+        - name: dind
+          image: docker:dind
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              memory: "200Mi"
+              cpu: 0.3
+            requests:
+              memory: "200Mi"
+              cpu: 0.3
+          volumeMounts:
+            - name: dockersock
+              mountPath: /var/run/
+            - name: code
+              mountPath: /app/code
         - name: cee-intrepreter
           image: chan1992241/cee-interpreter:latest
           imagePullPolicy: Always
+          volumeMounts:
+            - name: dockersock
+              mountPath: /var/run/
+            - name: code
+              mountPath: /app/code
           resources:
             limits:
-              memory: "128Mi"
-              cpu: 500m
+              memory: "50Mi"
+              cpu: 0.1
             requests:
-              memory: "128Mi"
-              cpu: 500m
+              memory: "50Mi"
+              cpu: 0.1
+          securityContext:
+            privileged: true
           envFrom:
             - configMapRef:
                 name: cee-intrepreter-configmap
             - secretRef:
                 name: cee-intrepreter-secrets
+      volumes:
+        - name: dockersock
+          emptyDir: {}
+        - name: code
+          emptyDir: {}
       nodeSelector:
         hostname: node2
 ---

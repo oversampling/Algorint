@@ -1,0 +1,62 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client
+  namespace: client
+spec:
+  type: LoadBalancer
+  selector:
+    app: client-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: client-app
+  name: client-app
+  namespace: client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client-app
+  template:
+    metadata:
+      labels:
+        app: client-app
+    spec:
+      containers:
+        - name: client-app
+          image: chan1992241/client:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: client-configmap
+            - secretRef:
+                name: client-secrets
+          resources:
+            limits:
+              memory: "800Mi"
+              cpu: "500m"
+            requests:
+              memory: "800Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: client-configmap
+  namespace: client
+data:
+  ENV: production
+  MONGO_URI: algorint-application-database.cluster-clfikoaf0bsn.ap-southeast-1.docdb.amazonaws.com
+  ROUTER_URL: http://router-service.router.svc.cluster.local:80
