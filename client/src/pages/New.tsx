@@ -52,6 +52,10 @@ export default function New() {
                       stdin: "",
                       stdout: "",
                       isHidden: true,
+                      configuration: {
+                          time_limit: 2,
+                          memory_limit: 200,
+                      },
                   },
               ])
             : list[assignment_index]["test_cases"].push({
@@ -59,6 +63,10 @@ export default function New() {
                   stdin: "",
                   stdout: "",
                   isHidden: true,
+                  configuration: {
+                      time_limit: 2,
+                      memory_limit: 200,
+                  },
               });
         setAssignmentList(list);
         setPost({ ...post, assignments: list });
@@ -114,6 +122,9 @@ export default function New() {
             list[index]["test_cases"][testIndex][name] = value;
         } else if (name === "isHidden") {
             list[index]["test_cases"][testIndex][name] = e.target.checked;
+        } else if (name === "time_limit" || name === "memory_limit") {
+            list[index]["test_cases"][testIndex]["configuration"][name] =
+                parseInt(value);
         }
         setAssignmentList(list);
         setPost({ ...post, assignments: list });
@@ -176,6 +187,10 @@ export default function New() {
                             stdout: "",
                             replace: [{ from: "", to: "" }],
                             isHidden: true,
+                            configuration: {
+                                time_limit: 2,
+                                memory_limit: 200,
+                            },
                         },
                     ];
                     return;
@@ -585,6 +600,70 @@ export default function New() {
                                                                                     }}
                                                                                 />
                                                                             </FloatingLabel>
+                                                                            <Form.Label>
+                                                                                Time
+                                                                                Limit:{" "}
+                                                                                {
+                                                                                    test
+                                                                                        .configuration
+                                                                                        .time_limit
+                                                                                }{" "}
+                                                                            </Form.Label>
+                                                                            <Form.Range
+                                                                                name="time_limit"
+                                                                                onChange={(
+                                                                                    e
+                                                                                ) => {
+                                                                                    onTestCasesChange(
+                                                                                        e,
+                                                                                        index,
+                                                                                        testIndex
+                                                                                    );
+                                                                                }}
+                                                                                min={
+                                                                                    1
+                                                                                }
+                                                                                max={
+                                                                                    10
+                                                                                }
+                                                                                value={
+                                                                                    test
+                                                                                        .configuration
+                                                                                        .time_limit
+                                                                                }
+                                                                            />
+                                                                            <Form.Label>
+                                                                                Memory
+                                                                                Limit:{" "}
+                                                                                {
+                                                                                    test
+                                                                                        .configuration
+                                                                                        .memory_limit
+                                                                                }{" "}
+                                                                            </Form.Label>
+                                                                            <Form.Range
+                                                                                name="memory_limit"
+                                                                                onChange={(
+                                                                                    e
+                                                                                ) => {
+                                                                                    onTestCasesChange(
+                                                                                        e,
+                                                                                        index,
+                                                                                        testIndex
+                                                                                    );
+                                                                                }}
+                                                                                min={
+                                                                                    50
+                                                                                }
+                                                                                max={
+                                                                                    200
+                                                                                }
+                                                                                value={
+                                                                                    test
+                                                                                        .configuration
+                                                                                        .memory_limit
+                                                                                }
+                                                                            />
                                                                         </Card.Body>
                                                                     </Card>
                                                                 );
