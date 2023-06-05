@@ -27,15 +27,15 @@ RUN cd server && npm install
 
 COPY server/ /app/server
 
-RUN cd server &&  npm run build
+WORKDIR /app/server
+
+RUN npm run build
 
 ENV ENV=production
 
 EXPOSE 3000
 
-COPY --from=builder /app/dist dist
-
-WORKDIR /app/server
+COPY --from=builder /app/dist /app/dist
 
 RUN wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
 
