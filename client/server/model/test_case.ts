@@ -10,6 +10,10 @@ export interface ITestCase {
         to: string,
     }],
     isHidden: boolean,
+    configuration: {
+        time_limit: number,
+        memory_limit: number,
+    }
 }
 
 const TestCaseSchema = new Schema<ITestCase>({
@@ -25,6 +29,16 @@ const TestCaseSchema = new Schema<ITestCase>({
     isHidden: {
         type: Boolean,
         default: true
+    },
+    configuration: {
+        time_limit: {
+            type: Number,
+            default: 2
+        },
+        memory_limit: {
+            type: Number,
+            default: 200,
+        }
     }
 });
 

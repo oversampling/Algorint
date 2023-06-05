@@ -220,7 +220,8 @@ app.post("/api/posts/new", isLoggedIn, async (req: Request, res: Response, next:
                             stdin: test_case.stdin,
                             stdout: test_case.stdout,
                             replace: test_case.replace ? test_case.replace : [{from: "", to: ""}],
-                            isHidden: test_case.isHidden
+                            isHidden: test_case.isHidden,
+                            configuration: test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200}
                         });
                         await newTestCase.save();
                         newAssignment.test_cases.push(newTestCase._id);
@@ -253,7 +254,8 @@ app.post("/api/posts/assignment/execute", isLoggedIn, async (req: Request, res: 
                 language,
                 test_cases: test_cases.map((test_case: any) => test_case.stdout),
                 input: test_cases.map((test_case: any) => test_case.stdin),
-                replace: test_cases.map((test_case: any) => test_case.replace)
+                replace: test_cases.map((test_case: any) => test_case.replace),
+                configuration: test_cases.map((test_case: any) => test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200})
             })
             return res.json({submission_token: response.data})
         }
@@ -275,12 +277,14 @@ app.post("/api/posts/assignment/submit", isLoggedIn, async (req: Request, res: R
     const stdin: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdin)
     const stdout: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdout)
     const replace: {from: string, to: string}[][] = assignment.test_cases.map((test_case: any)=> test_case.replace)
+    const configuration = assignment.test_cases.map((test_case: any)=> test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200})
     const response = await axios.post(`${ROUTER_URL}/make_submission`, {
         code,
         language,
         test_cases: stdout,
         input: stdin,
-        replace: replace
+        replace: replace,
+        configuration: configuration
     })
     return res.json({submission_token: response.data})
 })
@@ -365,13 +369,15 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                         testCaseToUpdate.stdout = test_case.stdout;
                                         testCaseToUpdate.replace = test_case.replace || [{from: "", to: ""}];
                                         testCaseToUpdate.isHidden = test_case.isHidden;
+                                        testCaseToUpdate.configuration = test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200};
                                         await testCaseToUpdate.save();
                                     }else{
                                         const newTestCase = new TestCase({
                                             stdin: test_case.stdin,
                                             stdout: test_case.stdout,
                                             replace: test_case.replace || [{from: "", to: ""}],
-                                            isHidden: test_case.isHidden
+                                            isHidden: test_case.isHidden,
+                                            configuration: test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200}
                                         });
                                         await newTestCase.save();
                                         assingmentToUpdate.test_cases.push(newTestCase._id);
@@ -397,6 +403,7 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                         testCaseToUpdate.stdout = test_case.stdout;
                                         testCaseToUpdate.replace = test_case.replace;
                                         testCaseToUpdate.isHidden = test_case.isHidden;
+                                        testCaseToUpdate.configuration = test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200};
                                         await testCaseToUpdate.save();
                                     }
                                 }else{
@@ -404,7 +411,8 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
                                         stdin: test_case.stdin,
                                         stdout: test_case.stdout,
                                         replace: test_case.replace ? test_case.replace : [{from: "", to: ""}],
-                                        isHidden: test_case.isHidden
+                                        isHidden: test_case.isHidden,
+                                        configuration: test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200}
                                     });
                                     await newTestCase.save();
                                     newAssignment.test_cases.push(newTestCase._id);

@@ -7,6 +7,10 @@ export interface Test_Case {
     stdin: string;
     stdout: string;
     isHidden: boolean;
+    configuration: {
+        time_limit: number;
+        memory_limit: number;
+    }
 }
 
 export interface Assignment {

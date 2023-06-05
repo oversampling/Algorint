@@ -18,6 +18,10 @@ export interface INewPost {
                         to: string,
                     }],
                     isHidden: boolean,
+                    configuration: {
+                        time_limit: number,
+                        memory_limit: number,
+                    }
                 }
             ]
         }
