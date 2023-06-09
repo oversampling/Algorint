@@ -39,10 +39,12 @@ class Sandbox:
             mem_limit=mem_limit,
             # Executable file will be generated when compile, so mode shoudl be 'rw'
             volumes={f'{workdir}/code': {'bind': workdir, 'mode': 'rw'}})
-        self.container.start()
         self.stdin = self.container.attach_socket(params={'stdin': 1, 'stdout': 0, 'stderr': 0, 'stream': 1})
         self.stdin._sock.setblocking(0)
         self.stdin._writing = True
+
+    def start_container(self):
+        self.container.start()
 
     def write(self, data: str):
         self.stdin.write(data.encode("utf-8"))
@@ -131,26 +133,8 @@ class Worker():
         with open(filename, "r") as f:
             return f.read()
 
-    def identify_error(self, sandbox: Sandbox, process: Literal["Compile Time", "Run Time"]):
-        try:
-            sandbox.wait(timeout=sandbox.timeout)
-            status = sandbox.status()
-        except requests.exceptions.ConnectionError as e:
-            raise ApplicationError(process, f"{process} Limit Exceeded\n\t{process} Limit = {sandbox.timeout}s")
-        except Exception:
-            raise
-        else:
-            if (status["ExitCode"] != 0):
-                if (status["OOMKilled"] == True):
-                    raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
-                else:
-                    time.sleep(0.1) # Wait for the output to be written to the container
-                    raise ApplicationError(process, sandbox.output()[1])
-            else:
-                return None
 
-
-    def compile(self, language: str, timeout: int = 2, mem_limit: str = "100m", pids_limit: int = 500):
+    def compile(self, language: str, timeout: int = 5, mem_limit: str = "100m", pids_limit: int = 500):
         if (language == "cpp"):
             cmd = "c++ --static code.cpp -o code"
         elif (language == "c"):
@@ -161,7 +145,7 @@ class Worker():
             raise Exception("Language not supported")
         try:
             sandbox = Sandbox(self.languages[language], self.dind, command=cmd, timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
-            self.identify_error(sandbox, "Compile Time")
+            self.__run_sandbox(sandbox, None, "Compile Time")
             del sandbox
         except ApplicationError as e:
             raise e
@@ -176,7 +160,7 @@ class Worker():
         try:
             if data is not None:
                 sandbox.write(data + "\n")
-            self.identify_error(sandbox, "Run Time")
+            self.__run_sandbox(sandbox, data, "Run Time")
         except ApplicationError as e:
             return "", str(e)
         stdout, stderr = sandbox.output()
@@ -186,16 +170,39 @@ class Worker():
     def transform_code(self, code: str, _from: str, _to:str):
         return code.replace(_from, _to)
 
-    def __execute(self, language) -> tuple[str, str]:
+    def __check_memory_limit(self, sandbox: Sandbox, process: Literal["Compile Time", "Run Time"]):
+        if (sandbox.status()["OOMKilled"] == True):
+            raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
+
+    def __run_sandbox(self, sandbox: Sandbox, input: str | None, process: Literal["Compile Time", "Run Time"]):
         try:
-            self.compile(language, timeout=5, mem_limit="100m", pids_limit=500)
+            sandbox.start_container()
+            if input is not None:
+                sandbox.write(input + "\n")
+            sandbox.wait(timeout=sandbox.timeout)
+        except requests.exceptions.ConnectionError as e:
+            # Runtime limit exceeded
+            raise ApplicationError(process, f"{process} Limit Exceeded\n\t{process} Limit = {sandbox.timeout}s")
+        except Exception as e:
+            raise ApplicationError(process, f"Server error in {process} with error\n{str(e)}")
+        else:
+            self.__check_memory_limit(sandbox, process)
+            if (sandbox.status()["ExitCode"] != 0):
+                # Syntax Error
+                raise ApplicationError(process, sandbox.output()[1])
+            else:
+                return None
+
+    def __execute(self, language, timeout: int = 2, mem_limit:  str = "100m", pids_limit: int = 500) -> tuple[str, str]:
+        try:
+            self.compile(language, timeout=5, mem_limit=mem_limit, pids_limit=pids_limit)
         except ApplicationError as e:
             return "", f"Compile Time Error\n{str(e)}"
         except Exception as e:
             # Compile error
             return "", f"Compile Time Error\n{str(e)}"
         else:
-            stdout, stderr = self.run_executable()
+            stdout, stderr = self.run_executable(timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
             return stdout, stderr
 
     def __save_input(self, input: str):
@@ -260,6 +267,8 @@ class Worker():
             "replace": submission_data["replace"],
             "submission_id": submission_id,
             "stdin": submission_data["input"],
+            "time_limit": submission_data["time_limit"], # time_limit: [1, 2, 3, ...]
+            "memory_limit": submission_data["memory_limit"], # memory_limit: [1, 2, 3, ...]
         }
         for index, code_input in enumerate(submission_data["input"]):
             # --------------------------------------------------------------------------
@@ -280,7 +289,7 @@ class Worker():
                 self.save_code(code, submission_data["language"])
                 # Save the stdin to a file
                 self.__save_input(code_input)
-                stdout, stderr = self.__execute(submission_data["language"])
+                stdout, stderr = self.__execute(submission_data["language"], timeout=submission_data["time_limit"][index], mem_limit=f"{submission['memory_limit'][index]}m", pids_limit=500)
                 # --------------------------------------------------------------------------
                 # Encode the output to base64
                 stdout = base64.b64encode(stdout.encode('utf-8')).decode()
@@ -399,6 +408,6 @@ if __name__ == "__main__":
         envrionment=os.getenv("ENVIRONMENT"),
         cpp=CPP_CEE_COMPILER_IMAGE,
         c=C_CEE_COMPILER_IMAGE,
-        rust=RUST_CEE_COMPILER_IMAGE,
+        # rust=RUST_CEE_COMPILER_IMAGE,
         alpine=ALPINE)
     worker.run(os.getenv("CEE_COMPILER_QUEUE_NAME").strip())

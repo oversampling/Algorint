@@ -108,7 +108,8 @@ def make_submission():
         "code": <str>,
         "input": <str>[],
         "test_cases" <str>[],
-        "replace": {"from": <str>, "to": <str>}[][]
+        "replace": {"from": <str>, "to": <str>}[][],
+        "configuration: {"memory_limit": <int>, "time_limit": <int>}[]
     }
     """
     # Retrieve submission data from request body
@@ -118,6 +119,8 @@ def make_submission():
     input = data["input"]
     test_cases = data["test_cases"]
     replace = data["replace"]
+    memory_limit = [configuration["memory_limit"] for configuration in data["configuration"]] or [100 for _ in range(len(test_cases))]
+    time_limit = [configuration["time_limit"] for configuration in data["configuration"]] or [2 for _ in range(len(test_cases))]
     # Save to submission database
     submission_id = str(uuid.uuid4())
     submission = {
@@ -128,7 +131,10 @@ def make_submission():
         "test_cases": test_cases,
         "replace": replace,
         "submission_id": submission_id,
+        "memory_limit": memory_limit,
+        "time_limit": time_limit
     }
+    # Save submission to redis
     execute_command(redis_master.set, submission_id,
                     json.dumps(submission), 600)
     # Add submission to queue

@@ -39,10 +39,12 @@ class Sandbox:
             pids_limit=pids_limit,
             mem_limit=mem_limit,
             volumes={f'{workdir}/code': {'bind': workdir, 'mode': 'ro'}})
-        self.container.start()
         self.stdin = self.container.attach_socket(params={'stdin': 1, 'stdout': 0, 'stderr': 0, 'stream': 1})
         self.stdin._sock.setblocking(0)
         self.stdin._writing = True
+
+    def start_container(self):
+        self.container.start()
 
     def write(self, data: str):
         self.stdin.write(data.encode("utf-8"))
@@ -128,23 +130,25 @@ class Worker():
     def transform_code(self, code: str, _from: str, _to:str):
         return code.replace(_from, _to)
 
-    def identify_error(self, sandbox: Sandbox, process: Literal["Compile Time", "Run Time"]):
+    def __check_memory_limit(self, sandbox: Sandbox, process: Literal["Compile Time", "Run Time"]):
+        if (sandbox.status()["OOMKilled"] == True):
+            raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
+
+    def __run_sandbox(self, sandbox: Sandbox, input: str, process: Literal["Compile Time", "Run Time"]):
         try:
+            sandbox.start_container()
+            if input is not None:
+                sandbox.write(input + "\n")
             sandbox.wait(timeout=sandbox.timeout)
-            status = sandbox.status()
+        except ApplicationError as e:
+            raise ApplicationError(process, f"In running sandbox")
         except requests.exceptions.ConnectionError as e:
+            # Runtime limit exceeded
             raise ApplicationError(process, f"{process} Limit Exceeded\n\t{process} Limit = {sandbox.timeout}s")
-        except Exception:
-            raise
+        except Exception as e:
+            raise ApplicationError(process, f"Server error in {process} with error\n{str(e)}")
         else:
-            if (status["ExitCode"] != 0):
-                if (status["OOMKilled"] == True):
-                    raise ApplicationError(process, f"Memory Limit Exceeded\n\tMemory Limit: {sandbox.mem_limit}")
-                else:
-                    time.sleep(0.1) # Wait for the output to be written to the container
-                    raise ApplicationError(process, sandbox.output()[1])
-            else:
-                return None
+            self.__check_memory_limit(sandbox, process)
 
     def __execute(self, language: Literal["python", "nodejs"], timeout: int = 2, mem_limit: str = "100m", pids_limit: int = 500) -> tuple[str, str]:
         if (language == "python"):
@@ -155,9 +159,7 @@ class Worker():
             raise Exception("Language not supported")
         data = self.read_file(f'{self.workdir}/code/input.txt')
         try:
-            if data is not None:
-                sandbox.write(data + "\n")
-            self.identify_error(sandbox, "Run Time")
+            self.__run_sandbox(sandbox, data, "Run Time")
         except ApplicationError as e:
             return "", f"Run Time Error\n{str(e)}"
         except Exception as e:
@@ -216,13 +218,15 @@ class Worker():
         submission_data = json.loads(data.decode())
         # --------------------------------------------------------------------------
         # handle multiple input file
-        submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result", "replace", "stdin"]] = {
+        submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result", "replace", "stdin", "memory_limit", "time_limit"]] = {
             "stdout": [],
             "stderr": [],
             "test_cases": submission_data["test_cases"],
             "replace": submission_data["replace"], # replace: [[{"from": "from", "to": "to"}, {"from": "from", "to": "to"}], [{"from": "from", "to": "to"}], ...]
             "submission_id": submission_id,
             "stdin": submission_data["input"],
+            "time_limit": submission_data["time_limit"], # time_limit: [1, 2, 3, ...]
+            "memory_limit": submission_data["memory_limit"], # memory_limit: [1, 2, 3, ...]
         }
         for index, code_input in enumerate(submission_data["input"]):
             try:
@@ -242,7 +246,7 @@ class Worker():
                 self.save_code(code, submission_data["language"])
                 # Save the stdin to a file
                 self.__save_input(code_input)
-                stdout, stderr = self.__execute(submission_data["language"])
+                stdout, stderr = self.__execute(submission_data["language"], submission_data["time_limit"][index], f"{submission['memory_limit'][index]}m")
                 # --------------------------------------------------------------------------
                 # Encode the output to base64
                 stdout = base64.b64encode(stdout.encode('utf-8')).decode()
