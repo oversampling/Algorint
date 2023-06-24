@@ -51,8 +51,48 @@ kubectl apply -f ./kubernetes/development/cee-compiler-secrets.yml
 kubectl apply -f ./kubernetes/development/cee-compiler-deployment.yml
 ```
 
-**Delete Every Deployment**
-
+**Application Database**
 ```bash
-kubectl delete ns router cee-intrepreter cee-compiler judge redis submission-queue
+cd application_database
+kubectl apply -f ./kubernetes/mongo-namespace.yml
+kubectl apply -f ./kubernetes/mongo-deployment.yml
+```
+
+**Setup Prometheus**
+```bash
+cd monitoring
+kubectl create -f ./manifests/setup/
+kubectl create -f ./manifests/
+
+# Prometheus
+kubectl -n monitoring port-forward svc/prometheus-operated 9090
+
+# Grafana
+kubectl -n monitoring port-forward svc/grafana 8000:3000
+```
+
+**Setup Client**
+```bash
+cd client
+kubectl apply -f ./kubernetes/development/client-namespace.yml
+kubectl apply -f ./kubernetes/development/client-secret.yml
+kubectl apply -f ./kubernetes/development/client-deployment.yml
+```
+
+**Setup Judge**
+```bash
+kubectl apply -f ./kubernetes/development/judge-namespace.yml
+kubectl apply -f ./kubernetes/development/judge-secrets.yml
+kubectl apply -f ./kubernetes/development/judge-deployment.yml
+```
+
+**Delete Every Deployment**
+```bash
+kubectl delete ns router cee-intrepreter cee-compiler judge redis submission-queue mongo client
+```
+
+**Setup Kind Cluster**
+```bash
+kind create cluster --name algorint --config kind-config.yml
+kind delete cluster --name algorint
 ```
