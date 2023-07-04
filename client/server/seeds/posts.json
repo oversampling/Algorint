@@ -1,0 +1,31 @@
+[
+  {
+    "title": "Python Test",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "Python assignments",
+        "language": "python",
+        "code_template": "print('Hello World')",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  }
+]
