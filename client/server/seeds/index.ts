@@ -23,6 +23,9 @@ if (!process.env.MONGO_USER) {
 
 
 async function seeds() {
+    await Post.deleteMany({});
+    await Assignment.deleteMany({});
+    await TestCase.deleteMany({});
     for (let post of posts) {
         const newPost = new Post({
             title: post.title,
