@@ -38,7 +38,8 @@ class Sandbox:
             cpu_period=cpu_period,
             pids_limit=pids_limit,
             mem_limit=mem_limit,
-            volumes={f'{workdir}/code': {'bind': workdir, 'mode': 'ro'}})
+            # volumes={f'{workdir}/code': {'bind': workdir, 'mode': 'ro'}}
+            )
         self.stdin = self.container.attach_socket(params={'stdin': 1, 'stdout': 0, 'stderr': 0, 'stream': 1})
         self.stdin._sock.setblocking(0)
         self.stdin._writing = True
@@ -100,7 +101,7 @@ class Worker():
         self.queue.basic_consume(queue=queue_name, on_message_callback=self.__callback)
         self.queue.start_consuming()
 
-    def save_code(self, code: str, language: str):
+    def save_code(self, code: str, language: str, sandbox: Sandbox):
         """
         Save the code to a file
 
@@ -115,11 +116,13 @@ class Worker():
             None
         """
         if (language == "python"):
-            with open("code/code.py", "w") as f:
-                f.write(code)
+            # with open("code/code.py", "w") as f:
+            #     f.write(code)
+            sandbox.add_file("code.py", code)
         elif (language == "nodejs"):
-            with open("code/code.js", "w") as f:
-                f.write(code)
+            # with open("code/code.js", "w") as f:
+            #     f.write(code)
+            sandbox.add_file("code.js", code)
         else:
             raise Exception("Language not supported")
 
@@ -150,16 +153,17 @@ class Worker():
         else:
             self.__check_memory_limit(sandbox, process)
 
-    def __execute(self, language: Literal["python", "nodejs"], timeout: int = 2, mem_limit: str = "100m", pids_limit: int = 500) -> tuple[str, str]:
+    def __execute(self, language: Literal["python", "nodejs"], code: str, input: str,timeout: int = 2, mem_limit: str = "100m", pids_limit: int = 500) -> tuple[str, str]:
         if (language == "python"):
             sandbox = Sandbox(self.languages[language], self.dind, command="python code.py", timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
+            sandbox.add_file("code.py", code)
         elif (language == "nodejs"):
             sandbox = Sandbox(self.languages[language], self.dind, command="node code.js", timeout=timeout, mem_limit=mem_limit, pids_limit=pids_limit)
+            sandbox.add_file("code.js", code)
         else:
             raise Exception("Language not supported")
-        data = self.read_file(f'{self.workdir}/code/input.txt')
         try:
-            self.__run_sandbox(sandbox, data, "Run Time")
+            self.__run_sandbox(sandbox, input, "Run Time")
         except ApplicationError as e:
             return "", f"Run Time Error\n{str(e)}"
         except Exception as e:
@@ -168,7 +172,7 @@ class Worker():
         del sandbox
         return stdout, stderr
 
-    def __save_input(self, input: str):
+    def __save_input(self, input: str, sandbox: Sandbox):
         """
         Save the input to a file
 
@@ -180,8 +184,9 @@ class Worker():
         Raises:
             None
         """
-        with open("code/input.txt", "w") as f:
-            f.write(input)
+        # with open("code/input.txt", "w") as f:
+        #     f.write(input)
+        sandbox.add_file("input.txt", input)
 
     def __clean_up(self, langauge):
         if (os.path.exists("code/input.txt")):
@@ -242,11 +247,7 @@ class Worker():
                     _to = base64.b64decode(replaces["to"]).decode()
                     code = self.transform_code(code, _from, _to)
                 # --------------------------------------------------------------------------
-                # Save the code, input to a file
-                self.save_code(code, submission_data["language"])
-                # Save the stdin to a file
-                self.__save_input(code_input)
-                stdout, stderr = self.__execute(submission_data["language"], submission_data["time_limit"][index], f"{submission['memory_limit'][index]}m")
+                stdout, stderr = self.__execute(submission_data["language"], code=code, input=code_input,timeout=submission_data["time_limit"][index], mem_limit=f"{submission['memory_limit'][index]}m")
                 # --------------------------------------------------------------------------
                 # Encode the output to base64
                 stdout = base64.b64encode(stdout.encode('utf-8')).decode()
@@ -269,8 +270,6 @@ class Worker():
             submission["result"] = "Judge Error"
             self.redis_command(self.redis.set,
                         submission_id, json.dumps(submission), 600)
-        # Clean up
-        self.__clean_up(submission_data["language"])
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def __judge(self, submission_id: str) -> int:

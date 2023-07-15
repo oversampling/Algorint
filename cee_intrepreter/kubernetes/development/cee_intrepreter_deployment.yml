@@ -49,16 +49,12 @@ spec:
           volumeMounts:
             - name: dockersock
               mountPath: /var/run/
-            - name: code
-              mountPath: /app/code
         - name: cee-intrepreter
           image: chan1992241/cee-interpreter:latest
           imagePullPolicy: Always
           volumeMounts:
             - name: dockersock
               mountPath: /var/run/
-            - name: code
-              mountPath: /app/code
           resources:
             limits:
               memory: "50Mi"
@@ -76,9 +72,6 @@ spec:
       volumes:
         - name: dockersock
           emptyDir: {}
-        - name: code
-          emptyDir: {}
-
 ---
 apiVersion: v1
 kind: ConfigMap
