@@ -219,8 +219,11 @@ class Worker():
         # --------------------------------------------------------------------------
         # Get Details from submission database
         submission_id = data["submission_id"]
-        data = self.redis_command(self.redis.get, submission_id)
-        submission_data = json.loads(data.decode())
+        submission_data_serialized = self.redis_command(self.redis.get, submission_id)
+        if (submission_data_serialized is None):
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+        submission_data = json.loads(submission_data_serialized.decode())
         # --------------------------------------------------------------------------
         # handle multiple input file
         submission: dict[Literal["stdout", "stderr", "test_cases", "submission_id", "result", "replace", "stdin", "memory_limit", "time_limit"]] = {
