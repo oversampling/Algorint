@@ -1,0 +1,112 @@
+[
+  {
+    "title": "Python Test",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "Python assignments",
+        "language": "python",
+        "code_template": "print('Hello World')",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "title": "CPP Test",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "CPP assignments",
+        "language": "cpp",
+        "code_template": "#include <iostream>\nusing namespace std;\nint main() {\n\tcout << \"Hello World\";\n\treturn 0;\n}",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  }
+]

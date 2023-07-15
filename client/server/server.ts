@@ -430,6 +430,54 @@ app.put("/api/posts", isLoggedIn, async (req: Request<{}, {}, IPost_Update_Body>
     return res.status(200).json({_id: postBody._id})
 })
 
+function timeout(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+app.post("/api/assignment/evaluate", async (req: Request<{}, {}, {}>, res: Response, next: NextFunction) => {
+    const post: any = await Post.findOne({title: "Python Test"}).populate({
+        path: "assignments",
+        populate: {
+            path: "test_cases"
+        }
+    })
+    if (post){
+        const assignment = post.assignments[0];
+        const code: string = post.assignments[0].code_template;
+        const language: string = post.assignments[0].language;
+        const stdin: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdin)
+        const stdout: string[] = assignment.test_cases.map((test_case: any)=> test_case.stdout)
+        const replace: {from: string, to: string}[][] = assignment.test_cases.map((test_case: any)=> test_case.replace)
+        const configuration = assignment.test_cases.map((test_case: any)=> test_case.configuration ? test_case.configuration : {time_limit: 2, memory_limit: 200})
+        const response = await axios.post(`${ROUTER_URL}/make_submission`, {
+            code,
+            language,
+            test_cases: stdout,
+            input: stdin,
+            replace: replace,
+            configuration: configuration
+        })
+        if (response.status === 200){
+            const submission_token = response.data
+            let submission_response = await axios.get(`${ROUTER_URL}/retrieve_submission/${submission_token}`)
+            let count = 0;
+            let status = submission_response.data.status;
+            while (status != "done execution"){
+              if (count > 20){
+                return res.status(400).json({message: "Execution Time Exceeded, execution time limit is 20 seconds"})
+              }
+              await timeout(1000);
+              submission_response = await axios.get(`${ROUTER_URL}/retrieve_submission/${submission_token}`)
+              status = submission_response.data.status;
+              count++;
+            }
+            return res.status(200).json(submission_response.data)
+        }
+        return res.status(400).json({message: "Execution Time Exceeded, execution time limit is 20 seconds"})
+    }
+    return res.status(400).json({message: "Post not found"})
+})
+
 app.all("*", (req: Request, res:Response, next: NextFunction) => {
     return res.redirect("/")
 })
