@@ -7,7 +7,9 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/docker/docker/client"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 )
@@ -41,31 +43,22 @@ func injectUsernamePasswordToRabbitMQURL(rabbitMQURL string, rabbitMQUsername st
 }
 
 func consume() {
-	ctx := context.Background()
-	var rabbitmq_url string = injectUsernamePasswordToRabbitMQURL(submission_queue, rabbitmq_username, rabbit_password)
-	conn, err := amqp.Dial(rabbitmq_url)
+	conn, err := Initiate_MQ_Client()
 	if err != nil {
 		log.Fatal("Failed to connect to RabbitMQ", err)
 	}
 	defer conn.Close()
-	ch, err := conn.Channel()
+	ch, err := Initiate_MQ_Channel(conn)
 	if err != nil {
 		log.Fatal("Failed to open a channel", err)
 	}
 	defer ch.Close()
-	q, err := ch.QueueDeclare(
-		queue_name,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
+	err = Declare_MQ_Queue(ch, queue_name)
 	if err != nil {
 		log.Fatal("Failed to declare a queue", err)
 	}
 	msgs, err := ch.Consume(
-		q.Name,
+		queue_name,
 		"",
 		false,
 		false,
@@ -77,40 +70,32 @@ func consume() {
 		log.Fatal("Failed to register a consumer", err)
 	}
 	forever := make(chan bool)
-	err = redis_client.Set(ctx, "cee:interpreter:status", "ready", 1000).Err()
-	if err != nil {
-		log.Printf("Failed to set status to ready")
-		panic(err)
-	}
-	val, err := redis_client.Get(ctx, "cee:interpreter:status").Result()
-	if err != nil {
-		log.Printf("Failed to get status")
-		panic(err)
-	}
-	log.Printf("Status: %s", val)
-	go func() {
-		for d := range msgs {
-			log.Printf("Received a message: %s", d.Body)
-			submission_id, err := Get_Submission_Token_From_MQ(d.Body)
-			if err != nil {
-				log.Printf("Error getting submission id from MQ\n" + err.Error())
-			}
-			result, err := Get_Submission_From_Redis(submission_id)
-			if err != nil {
-				log.Printf("Failed to get submission from redis\n" + err.Error())
-			}
-			log.Printf("Result: %s", result)
-			submission, err := Parse_Submission_From_Redis(result)
-			if err != nil {
-				log.Printf("Failed to parse submission from redis\n" + err.Error())
-			}
-			log.Printf("Submission: %v", submission)
-			d.Ack(true)
-		}
-	}()
-
+	go OnMessageReceived(msgs)
 	fmt.Println("Running...")
 	<-forever
+}
+
+func OnMessageReceived(msgs <-chan amqp.Delivery) {
+	for d := range msgs {
+		log.Printf("Received a message: %s", d.Body)
+		submission_id, err := Get_Submission_Token_From_MQ(d.Body)
+		if err != nil {
+			log.Printf("Error getting submission id from MQ\n" + err.Error())
+		}
+		result, err := Get_Submission_From_Redis(submission_id)
+		if err != nil {
+			log.Printf("Failed to get submission from redis\n" + err.Error())
+		}
+		_, err = Parse_Submission_From_Redis(result)
+		if err != nil {
+			log.Printf("Failed to parse submission from redis\n" + err.Error())
+		}
+		// log.Printf("Submission: %v", submission)
+		// Sleep 3 seconds in golang
+		time.Sleep(3 * time.Second)
+		log.Printf("Done processing submission: %s", submission_id)
+		d.Ack(true)
+	}
 }
 
 func Get_Submission_Token_From_MQ(body []byte) (string, error) {
@@ -138,4 +123,76 @@ func Parse_Submission_From_Redis(submission string) (Submission, error) {
 		return Submission{}, err
 	}
 	return submission_struct, nil
+}
+
+func Initiate_Docker_Client() (*client.Client, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
+	return cli, nil
+}
+
+func Initiate_MQ_Client() (*amqp.Connection, error) {
+	var rabbitmq_url string = injectUsernamePasswordToRabbitMQURL(submission_queue, rabbitmq_username, rabbit_password)
+	conn, err := amqp.Dial(rabbitmq_url)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func Declare_MQ_Queue(ch *amqp.Channel, queue_name string) error {
+	_, err := ch.QueueDeclare(
+		queue_name,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func Initiate_MQ_Channel(conn *amqp.Connection) (*amqp.Channel, error) {
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, err
+	}
+	return ch, nil
+}
+
+func Set_Data_To_Redis(key string, value string) error {
+	ctx := context.Background()
+	err := redis_client.Set(ctx, key, value, 0).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func Get_Data_From_Redis(key string) (string, error) {
+	ctx := context.Background()
+	val, err := redis_client.Get(ctx, key).Result()
+	if err != nil {
+		return "", err
+	}
+	return val, nil
+}
+
+func Initiate_Redis_Client() (*redis.Client, error) {
+	context := context.Background()
+	client := redis.NewClient(&redis.Options{
+		Addr:     redis_sentinel_address + ":5000",
+		Password: redis_password,
+		DB:       0,
+	})
+	_, err := client.Ping(context).Result()
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
