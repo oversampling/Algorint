@@ -1,0 +1,88 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cee
+  name: cee
+  namespace: cee
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cee
+  template:
+    metadata:
+      labels:
+        app: cee
+    spec:
+      containers:
+        - name: cee
+          image: chan1992241/cee-interpreter:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: dind
+              mountPath: /var/run/
+          resources:
+            limits:
+              memory: "50Mi"
+              cpu: 0.1
+            requests:
+              memory: "50Mi"
+              cpu: 0.1
+          securityContext:
+            privileged: true
+          envFrom:
+            - configMapRef:
+                name: cee-configmap
+            - secretRef:
+                name: cee-secrets
+      volumes:
+        - name: dind
+          persistentVolumeClaim:
+            claimName: cee-dind-pvc
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cee-configmap
+  namespace: cee
+data:
+  REDIS_SENTINELS: sentinel.redis.svc.cluster.local
+  SUBMISSION_QUEUE: submission-queue.submission-queue.svc.cluster.local
+  CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  ENVIRONMENT: development
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: cee-scaledobject
+  namespace: cee
+spec:
+  scaleTargetRef:
+    name: cee
+    kind: Deployment
+    apiVersion: apps/v1
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        vhostName: /
+        queueName: cee-intrepreter-queue
+        mode: QueueLength
+        value: "2"
+      authenticationRef:
+        name: cee-trigger-auth-rabbitmq-conn
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: cee-trigger-auth-rabbitmq-conn
+  namespace: cee
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: cee-secrets
+      key: RABBITMQ_HOST

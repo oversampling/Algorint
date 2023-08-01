@@ -1,0 +1,4 @@
+/kubernetes
+readme.md
+.dockerignore
+Dockerfile
