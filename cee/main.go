@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/go-units"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 )
@@ -287,18 +288,20 @@ func RunCode(cli client.Client, code []byte, input string, language string, time
 	ctx := context.Background()
 	// Create a container
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image:     languages_details[language]["image"],
-		Tty:       false, // False
-		OpenStdin: true,
-		// AttachStdin:  true,
-		// AttachStdout: true,
-		// AttachStderr: true,
+		Image:      languages_details[language]["image"],
+		Tty:        false,
+		OpenStdin:  true,
 		WorkingDir: "/app",
-		// Cmd:        []string{"ls", "-la"},
-		Cmd:         []string{"python", "code.py"},
-		StopTimeout: &time_limit,
+		Cmd:        strings.Split(languages_details[language]["cmd"], "-"),
 	}, &container.HostConfig{
 		Resources: container.Resources{
+			Ulimits: []*units.Ulimit{
+				{
+					Name: "nproc",
+					Soft: 100,
+					Hard: 1024,
+				},
+			},
 			Memory: int64(mem_limit_mb * 1024 * 1024),
 		},
 	}, nil, nil, "")
@@ -338,14 +341,24 @@ func RunCode(cli client.Client, code []byte, input string, language string, time
 		log.Println("Error in writing input to container\n " + err.Error())
 		return "", "", err
 	}
+	// Context with timeout
+	time_limit_ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time_limit)*time.Second)
+	defer cancel()
 	// Wait for container to finish
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	statusCh, errCh := cli.ContainerWait(time_limit_ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return "", "", err
+			return "", err.Error(), err
 		}
-	case <-statusCh:
+	case <-time_limit_ctx.Done():
+		cli.ContainerStop(ctx, resp.ID, container.StopOptions{})
+		return "", "Time Limit Exceeded", nil
+	case statusCode := <-statusCh:
+		log.Printf("Status Code: %d\n", statusCode.StatusCode)
+		if statusCode.StatusCode == 137 {
+			return "", "Memory Limit Exceeded", nil
+		}
 	}
 	// Get container logs
 	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
