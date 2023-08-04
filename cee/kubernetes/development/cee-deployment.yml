@@ -18,18 +18,15 @@ spec:
     spec:
       containers:
         - name: cee
-          image: chan1992241/cee-interpreter:latest
+          image: chan1992241/cee:latest
           imagePullPolicy: Always
-          volumeMounts:
-            - name: dind
-              mountPath: /var/run/
           resources:
             limits:
-              memory: "50Mi"
-              cpu: 0.1
+              memory: "1000Mi"
+              cpu: 1
             requests:
-              memory: "50Mi"
-              cpu: 0.1
+              memory: "200Mi"
+              cpu: 0.5
           securityContext:
             privileged: true
           envFrom:
@@ -37,10 +34,6 @@ spec:
                 name: cee-configmap
             - secretRef:
                 name: cee-secrets
-      volumes:
-        - name: dind
-          persistentVolumeClaim:
-            claimName: cee-dind-pvc
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -49,8 +42,11 @@ metadata:
   namespace: cee
 data:
   REDIS_SENTINELS: sentinel.redis.svc.cluster.local
-  SUBMISSION_QUEUE: submission-queue.submission-queue.svc.cluster.local
+  SUBMISSION_QUEUE: amqp://submission-queue.submission-queue.svc.cluster.local:5672/
+  REDIS_HOST: redis.redis.svc.cluster.local
   CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  # SUPPORTED_LANGUAGES: python@python:alpine3.16@python-code.py@.py,nodejs@node:lts-alpine3.17@node-code.js,c@frolvlad/alpine-gxx,cpp:frolvlad/alpine-gxx,rust:frolvlad/alpine-rust
+  SUPPORTED_LANGUAGES: python@python:alpine3.16@python-code.py@.py
   ENVIRONMENT: development
 ---
 apiVersion: keda.sh/v1alpha1
@@ -72,7 +68,7 @@ spec:
         vhostName: /
         queueName: cee-intrepreter-queue
         mode: QueueLength
-        value: "2"
+        value: "1"
       authenticationRef:
         name: cee-trigger-auth-rabbitmq-conn
 ---
