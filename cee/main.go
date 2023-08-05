@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/docker/go-units"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 var supported_languages []string = strings.Split(os.Getenv("SUPPORTED_LANGUAGES"), ",")
@@ -142,7 +145,7 @@ func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 			log.Printf("Failed to parse submission from redis\n" + err.Error())
 		}
 		log.Printf("Submission: %v", submission)
-		for index, code_input := range submission.Input {
+		for index, code_input := range submission.Stdin {
 			log.Printf("%v Processing input: %v", index, code_input)
 			// base64 decode code_input
 			code_input_decoded, err := base64.StdEncoding.DecodeString(code_input)
@@ -169,20 +172,64 @@ func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 			log.Printf("Code: %v", string(code))
 			log.Printf("Time Limit: %v", time_limit)
 			log.Printf("Memory Limit: %v", mem_limit)
+			v, _ := mem.VirtualMemory()
+			log.Printf("Total: %v, Free:%v, UsedPercent:%f%%\n", v.Total, v.Free, v.UsedPercent)
+			cpu, _ := cpu.Percent(time.Second, false)
+			log.Printf("CPU: %v\n", cpu)
 			log.Printf("Code Input: %v", string(code_input_decoded))
 			stdout, stderr, err := RunCode(*cli, code, code_input, submission.Language, time_limit, mem_limit)
 			if err != nil {
 				log.Printf("Failed to run code\n" + err.Error())
+				stdout = ""
+				stderr = "Error in executing code: " + err.Error()
 			}
 			log.Printf("Stdout: %v", stdout)
 			log.Printf("Stderr: %v", stderr)
-
+			// base64 encode stdout and stderr
+			base64_stdout := base64.StdEncoding.EncodeToString([]byte(stdout))
+			base64_stderr := base64.StdEncoding.EncodeToString([]byte(stderr))
+			submission.Stdout = append(submission.Stdout, base64_stdout)
+			submission.Stderr = append(submission.Stderr, base64_stderr)
 		}
-		// Sleep 3 seconds in golang
-		time.Sleep(3 * time.Second)
+		if err = Save_Submission_To_Redis(submission); err != nil {
+			log.Printf("Failed to save submission to redis\n" + err.Error())
+		}
+		statusCode, err := Judge_Submission(submission.SubmissionID)
+		if err != nil {
+			log.Printf("Failed to judge submission\n" + err.Error())
+		}
+		if statusCode == 200 {
+			submission_after_judge, err := Get_Submission_From_Redis(submission.SubmissionID)
+			if err != nil {
+				log.Printf("Failed to get submission after judge from redis\n" + err.Error())
+			}
+			submission_after_judge_parsed, err := Parse_Submission_From_Redis(submission_after_judge)
+			if err != nil {
+				log.Printf("Failed to parse submission after judge from redis\n" + err.Error())
+			}
+			submission_after_judge_parsed.Status = "done execution"
+			if err = Save_Submission_To_Redis(submission_after_judge_parsed); err != nil {
+				log.Printf("Failed to save judged submission to redis\n" + err.Error())
+			}
+		} else {
+			log.Printf("Failed to judge submission\n" + err.Error())
+		}
 		log.Printf("Done processing submission: %s", submission_id)
 		d.Ack(true)
 	}
+}
+
+func Save_Submission_To_Redis(submission Submission) error {
+	ctx := context.Background()
+	submission_json, err := json.Marshal(submission)
+	if err != nil {
+		return err
+	}
+	err = redis_client.Set(ctx, submission.SubmissionID, submission_json, 10*time.Minute).Err()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func Get_Submission_Token_From_MQ(body []byte) (string, error) {
@@ -400,4 +447,24 @@ func Make_Archieve(filename string, data []byte) (*bytes.Reader, error) {
 	}
 	content := bytes.NewReader(buf.Bytes())
 	return content, nil
+}
+
+func Judge_Submission(submission_id string) (int, error) {
+	if submission_id == "" {
+		return -1, fmt.Errorf("submission_id is empty")
+	}
+	jsonBody := []byte(fmt.Sprintf(`{"submission_id": "%s"}`, submission_id))
+	bodyReader := bytes.NewReader(jsonBody)
+	req, err := http.NewRequest("POST", "http://judge.judge.svc.cluster.local/judge", bodyReader)
+	if err != nil {
+		req.Body.Close()
+		return -1, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return -1, err
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode, nil
 }
