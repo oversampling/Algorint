@@ -177,7 +177,7 @@ func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 			cpu, _ := cpu.Percent(time.Second, false)
 			log.Printf("CPU: %v\n", cpu)
 			log.Printf("Code Input: %v", string(code_input_decoded))
-			stdout, stderr, err := RunCode(*cli, code, code_input, submission.Language, time_limit, mem_limit)
+			stdout, stderr, err := RunCode(*cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit)
 			if err != nil {
 				log.Printf("Failed to run code\n" + err.Error())
 				stdout = ""
@@ -373,17 +373,16 @@ func RunCode(cli client.Client, code []byte, input string, language string, time
 		return "", "Error in Starting container\n" + err.Error() + "\n", err
 	}
 	// Write input to container
-	waiter, err := cli.ContainerAttach(ctx, resp.ID, types.ContainerAttachOptions{
+	hijackedResponse, err := cli.ContainerAttach(ctx, resp.ID, types.ContainerAttachOptions{
 		Stream: true,
 		Stdin:  true,
-		Stdout: true,
-		Stderr: true,
+		Stdout: false,
+		Stderr: false,
 	})
 	if err != nil {
 		return "", "Error in Attach stream from container", err
 	}
-	waiter.Conn.SetDeadline(time.Now().Add(time.Duration(time_limit) * time.Second))
-	_, err = waiter.Conn.Write([]byte(input))
+	_, err = hijackedResponse.Conn.Write([]byte(input + "\n"))
 	if err != nil {
 		log.Println("Error in writing input to container\n " + err.Error())
 		return "", "", err
