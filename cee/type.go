@@ -22,3 +22,9 @@ type Submission struct {
 	Stderr       []string `json:"stderr,omitempty"`
 	Result       []bool   `json:"result,omitempty"`
 }
+
+type Execution_Result struct {
+	Submission_Index int
+	Stdout           string
+	Stderr           string
+}

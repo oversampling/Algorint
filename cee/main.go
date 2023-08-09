@@ -132,6 +132,7 @@ func consume(cli *client.Client) {
 func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 	for d := range msgs {
 		log.Printf("Received a message: %s", d.Body)
+		d.Ack(true)
 		submission_id, err := Get_Submission_Token_From_MQ(d.Body)
 		if err != nil {
 			log.Printf("Error getting submission id from MQ\n" + err.Error())
@@ -145,6 +146,8 @@ func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 			log.Printf("Failed to parse submission from redis\n" + err.Error())
 		}
 		log.Printf("Submission: %v", submission)
+		execution_channel := make(chan Execution_Result, len(submission.Stdin))
+		threading_ctx, cancel := context.WithCancel(context.Background())
 		for index, code_input := range submission.Stdin {
 			log.Printf("%v Processing input: %v", index, code_input)
 			// base64 decode code_input
@@ -177,17 +180,26 @@ func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 			cpu, _ := cpu.Percent(time.Second, false)
 			log.Printf("CPU: %v\n", cpu)
 			log.Printf("Code Input: %v", string(code_input_decoded))
-			stdout, stderr, err := RunCode(*cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit)
-			if err != nil {
-				log.Printf("Failed to run code\n" + err.Error())
-				stdout = ""
-				stderr = "Error in executing code: " + err.Error()
-			}
-			log.Printf("Stdout: %v", stdout)
-			log.Printf("Stderr: %v", stderr)
-			// base64 encode stdout and stderr
-			base64_stdout := base64.StdEncoding.EncodeToString([]byte(stdout))
-			base64_stderr := base64.StdEncoding.EncodeToString([]byte(stderr))
+			go RunCode(threading_ctx, cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit, index, execution_channel)
+		}
+		submission_results := []Execution_Result{}
+		for i := 0; i < len(submission.Stdin); i++ {
+			submission_result := <-execution_channel
+			submission_results = append(submission_results, submission_result)
+			log.Printf("Submission result %v: %v", i, submission_result)
+		}
+		cancel()
+		log.Printf("Running in main thread..")
+		reordered_submission_results := make([]Execution_Result, len(submission_results))
+		for _, result := range submission_results {
+			log.Printf("Submission Result: %v", result)
+			reordered_submission_results[result.Submission_Index] = result
+		}
+		for _, result := range reordered_submission_results {
+			base64_stdout := base64.StdEncoding.EncodeToString([]byte(result.Stdout))
+			base64_stderr := base64.StdEncoding.EncodeToString([]byte(result.Stderr))
+			log.Print("base64_stdout: " + base64_stdout)
+			log.Print("base64_stderr: " + base64_stderr)
 			submission.Stdout = append(submission.Stdout, base64_stdout)
 			submission.Stderr = append(submission.Stderr, base64_stderr)
 		}
@@ -215,7 +227,6 @@ func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 			log.Printf("Failed to judge submission\n" + err.Error())
 		}
 		log.Printf("Done processing submission: %s", submission_id)
-		d.Ack(true)
 	}
 }
 
@@ -331,7 +342,7 @@ func Initiate_Redis_Client() (*redis.Client, error) {
 	return client, nil
 }
 
-func RunCode(cli client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int) (string, string, error) {
+func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_index int, execution_channel chan Execution_Result) {
 	ctx := context.Background()
 	// Create a container
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
@@ -354,23 +365,22 @@ func RunCode(cli client.Client, code []byte, input string, language string, time
 	}, nil, nil, "")
 	if err != nil {
 		log.Println("Error in creating container\n " + err.Error())
-		return "", "", err
 	}
 	// Copy code to container
 	content, err := Make_Archieve(fmt.Sprintf("code%s", languages_details[language]["extension"]), code)
 	if err != nil {
-		return "", "Error in making archieve", err
+		log.Println("Error in creating container\n " + err.Error())
 	}
 	err = cli.CopyToContainer(ctx, resp.ID, "/app", content, types.CopyToContainerOptions{
 		AllowOverwriteDirWithFile: true,
 	})
 	if err != nil {
-		return "", "Error in copying file to container\n" + err.Error() + "\n", err
+		log.Println("Error in creating container\n " + err.Error())
 	}
 	// Start container
 	err = cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
-		return "", "Error in Starting container\n" + err.Error() + "\n", err
+		log.Println("Error in creating container\n " + err.Error())
 	}
 	// Write input to container
 	hijackedResponse, err := cli.ContainerAttach(ctx, resp.ID, types.ContainerAttachOptions{
@@ -380,12 +390,11 @@ func RunCode(cli client.Client, code []byte, input string, language string, time
 		Stderr: false,
 	})
 	if err != nil {
-		return "", "Error in Attach stream from container", err
+		log.Println("Error in creating container\n " + err.Error())
 	}
 	_, err = hijackedResponse.Conn.Write([]byte(input + "\n"))
 	if err != nil {
 		log.Println("Error in writing input to container\n " + err.Error())
-		return "", "", err
 	}
 	// Context with timeout
 	time_limit_ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time_limit)*time.Second)
@@ -395,30 +404,56 @@ func RunCode(cli client.Client, code []byte, input string, language string, time
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return "", err.Error(), err
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Sandbox error, try to run again",
+			})
 		}
 	case <-time_limit_ctx.Done():
 		cli.ContainerStop(ctx, resp.ID, container.StopOptions{})
-		return "", "Time Limit Exceeded", nil
+		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+			Submission_Index: submission_index,
+			Stdout:           "",
+			Stderr:           "Time Limit Exceeded",
+		})
 	case statusCode := <-statusCh:
 		log.Printf("Status Code: %d\n", statusCode.StatusCode)
 		if statusCode.StatusCode == 137 {
-			return "", "Memory Limit Exceeded", nil
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Memory Limit Exceeded",
+			})
 		}
+		out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+		if err != nil {
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Something wrong",
+			})
+		}
+		defer out.Close()
+		stdoutput := new(bytes.Buffer)
+		stderror := new(bytes.Buffer)
+		_, err = stdcopy.StdCopy(stdoutput, stderror, out)
+		if err != nil {
+			log.Println("Error in copying container logs\n " + err.Error())
+		}
+		log.Printf("Stdout: %s\nStderr: %s\n", stdoutput.String(), stderror.String())
+		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+			Submission_Index: submission_index,
+			Stdout:           stdoutput.String(),
+			Stderr:           stderror.String(),
+		})
+	case <-threading_ctx.Done():
+		return
 	}
-	// Get container logs
-	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
-	if err != nil {
-		return "", "", err
-	}
-	defer out.Close()
-	stdoutput := new(bytes.Buffer)
-	stderror := new(bytes.Buffer)
-	_, err = stdcopy.StdCopy(stdoutput, stderror, out)
-	if err != nil {
-		return "", "", err
-	}
-	return stdoutput.String(), stderror.String(), nil
+}
+
+func Put_Execution_Result_To_Channel(execution_channel chan Execution_Result, execution_result Execution_Result) {
+	execution_channel <- execution_result
 }
 
 func Make_Archieve(filename string, data []byte) (*bytes.Reader, error) {
