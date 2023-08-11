@@ -18,10 +18,10 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-units"
+	"github.com/pbnjay/memory"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/v3/mem"
 )
 
 var supported_languages []string = strings.Split(os.Getenv("SUPPORTED_LANGUAGES"), ",")
@@ -114,7 +114,7 @@ func consume(cli *client.Client) {
 	msgs, err := ch.Consume(
 		queue_name,
 		"",
-		false,
+		true,
 		false,
 		false,
 		false,
@@ -122,6 +122,9 @@ func consume(cli *client.Client) {
 	)
 	if err != nil {
 		log.Fatal("Failed to register a consumer", err)
+	}
+	if err := SetPrefetchCount(ch, 100); err != nil {
+		log.Fatal("Failed to set prefetch count", err)
 	}
 	forever := make(chan bool)
 	go OnMessageReceived(msgs, cli)
@@ -132,102 +135,107 @@ func consume(cli *client.Client) {
 func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
 	for d := range msgs {
 		log.Printf("Received a message: %s", d.Body)
-		d.Ack(true)
-		submission_id, err := Get_Submission_Token_From_MQ(d.Body)
-		if err != nil {
-			log.Printf("Error getting submission id from MQ\n" + err.Error())
-		}
-		result, err := Get_Submission_From_Redis(submission_id)
-		if err != nil {
-			log.Printf("Failed to get submission from redis\n" + err.Error())
-		}
-		submission, err := Parse_Submission_From_Redis(result)
-		if err != nil {
-			log.Printf("Failed to parse submission from redis\n" + err.Error())
-		}
-		log.Printf("Submission: %v", submission)
-		execution_channel := make(chan Execution_Result, len(submission.Stdin))
-		threading_ctx, cancel := context.WithCancel(context.Background())
-		for index, code_input := range submission.Stdin {
-			log.Printf("%v Processing input: %v", index, code_input)
-			// base64 decode code_input
-			code_input_decoded, err := base64.StdEncoding.DecodeString(code_input)
-			if err != nil {
-				log.Printf("Failed to decode input\n" + err.Error())
-			}
-			code, err := base64.StdEncoding.DecodeString(submission.Code)
-			if err != nil {
-				log.Printf("Failed to decode code\n" + err.Error())
-			}
-			for _, replaces := range submission.Replace[index] {
-				from, err := base64.StdEncoding.DecodeString(replaces.From)
-				if err != nil {
-					log.Printf("Failed to decode replace from\n" + err.Error())
-				}
-				to, err := base64.StdEncoding.DecodeString(replaces.To)
-				if err != nil {
-					log.Printf("Failed to decode replace to\n" + err.Error())
-				}
-				code = bytes.Replace(code, from, to, -1)
-			}
-			time_limit := submission.TimeLimit[index]
-			mem_limit := submission.MemoryLimit[index]
-			log.Printf("Code: %v", string(code))
-			log.Printf("Time Limit: %v", time_limit)
-			log.Printf("Memory Limit: %v", mem_limit)
-			v, _ := mem.VirtualMemory()
-			log.Printf("Total: %v, Free:%v, UsedPercent:%f%%\n", v.Total, v.Free, v.UsedPercent)
-			cpu, _ := cpu.Percent(time.Second, false)
-			log.Printf("CPU: %v\n", cpu)
-			log.Printf("Code Input: %v", string(code_input_decoded))
-			go RunCode(threading_ctx, cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit, index, execution_channel)
-		}
-		submission_results := []Execution_Result{}
-		for i := 0; i < len(submission.Stdin); i++ {
-			submission_result := <-execution_channel
-			submission_results = append(submission_results, submission_result)
-			log.Printf("Submission result %v: %v", i, submission_result)
-		}
-		cancel()
-		log.Printf("Running in main thread..")
-		reordered_submission_results := make([]Execution_Result, len(submission_results))
-		for _, result := range submission_results {
-			log.Printf("Submission Result: %v", result)
-			reordered_submission_results[result.Submission_Index] = result
-		}
-		for _, result := range reordered_submission_results {
-			base64_stdout := base64.StdEncoding.EncodeToString([]byte(result.Stdout))
-			base64_stderr := base64.StdEncoding.EncodeToString([]byte(result.Stderr))
-			log.Print("base64_stdout: " + base64_stdout)
-			log.Print("base64_stderr: " + base64_stderr)
-			submission.Stdout = append(submission.Stdout, base64_stdout)
-			submission.Stderr = append(submission.Stderr, base64_stderr)
-		}
-		if err = Save_Submission_To_Redis(submission); err != nil {
-			log.Printf("Failed to save submission to redis\n" + err.Error())
-		}
-		statusCode, err := Judge_Submission(submission.SubmissionID)
-		if err != nil {
-			log.Printf("Failed to judge submission\n" + err.Error())
-		}
-		if statusCode == 200 {
-			submission_after_judge, err := Get_Submission_From_Redis(submission.SubmissionID)
-			if err != nil {
-				log.Printf("Failed to get submission after judge from redis\n" + err.Error())
-			}
-			submission_after_judge_parsed, err := Parse_Submission_From_Redis(submission_after_judge)
-			if err != nil {
-				log.Printf("Failed to parse submission after judge from redis\n" + err.Error())
-			}
-			submission_after_judge_parsed.Status = "done execution"
-			if err = Save_Submission_To_Redis(submission_after_judge_parsed); err != nil {
-				log.Printf("Failed to save judged submission to redis\n" + err.Error())
-			}
-		} else {
-			log.Printf("Failed to judge submission\n" + err.Error())
-		}
-		log.Printf("Done processing submission: %s", submission_id)
+		go Message_Handler(d.Body, cli)
+		log.Printf("Done processing message: %s", d.Body)
 	}
+}
+
+func Message_Handler(body []byte, cli *client.Client) {
+	log.Printf("Received a message: %s", body)
+	// d.Ack(true)
+	submission_id, err := Get_Submission_Token_From_MQ(body)
+	if err != nil {
+		log.Printf("Error getting submission id from MQ\n" + err.Error())
+	}
+	result, err := Get_Submission_From_Redis(submission_id)
+	if err != nil {
+		log.Printf("Failed to get submission from redis\n" + err.Error())
+	}
+	submission, err := Parse_Submission_From_Redis(result)
+	if err != nil {
+		log.Printf("Failed to parse submission from redis\n" + err.Error())
+	}
+	log.Printf("Submission: %v", submission)
+	execution_channel := make(chan Execution_Result, len(submission.Stdin))
+	threading_ctx, cancel := context.WithCancel(context.Background())
+	for index, code_input := range submission.Stdin {
+		log.Printf("%v Processing input: %v", index, code_input)
+		// base64 decode code_input\
+		code_input_decoded, err := base64.StdEncoding.DecodeString(code_input)
+		if err != nil {
+			log.Printf("Failed to decode input\n" + err.Error())
+		}
+		code, err := base64.StdEncoding.DecodeString(submission.Code)
+		if err != nil {
+			log.Printf("Failed to decode code\n" + err.Error())
+		}
+		for _, replaces := range submission.Replace[index] {
+			from, err := base64.StdEncoding.DecodeString(replaces.From)
+			if err != nil {
+				log.Printf("Failed to decode replace from\n" + err.Error())
+			}
+			to, err := base64.StdEncoding.DecodeString(replaces.To)
+			if err != nil {
+				log.Printf("Failed to decode replace to\n" + err.Error())
+			}
+			code = bytes.Replace(code, from, to, -1)
+		}
+		time_limit := submission.TimeLimit[index]
+		mem_limit := submission.MemoryLimit[index]
+		log.Printf("Code: %v", string(code))
+		log.Printf("Time Limit: %v", time_limit)
+		log.Printf("Memory Limit: %v", mem_limit)
+		PrintMemUsage()
+		cpu, _ := cpu.Percent(time.Second, false)
+		log.Printf("CPU: %v\n", cpu)
+		log.Printf("Code Input: %v", string(code_input_decoded))
+		go RunCode(threading_ctx, cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit, index, execution_channel)
+	}
+	submission_results := []Execution_Result{}
+	for i := 0; i < len(submission.Stdin); i++ {
+		submission_result := <-execution_channel
+		submission_results = append(submission_results, submission_result)
+		log.Printf("Submission result %v: %v", i, submission_result)
+	}
+	cancel()
+	log.Printf("Running in main thread..")
+	reordered_submission_results := make([]Execution_Result, len(submission_results))
+	for _, result := range submission_results {
+		log.Printf("Submission Result: %v", result)
+		reordered_submission_results[result.Submission_Index] = result
+	}
+	for _, result := range reordered_submission_results {
+		base64_stdout := base64.StdEncoding.EncodeToString([]byte(result.Stdout))
+		base64_stderr := base64.StdEncoding.EncodeToString([]byte(result.Stderr))
+		log.Print("base64_stdout: " + base64_stdout)
+		log.Print("base64_stderr: " + base64_stderr)
+		submission.Stdout = append(submission.Stdout, base64_stdout)
+		submission.Stderr = append(submission.Stderr, base64_stderr)
+	}
+	if err = Save_Submission_To_Redis(submission); err != nil {
+		log.Printf("Failed to save submission to redis\n" + err.Error())
+	}
+	statusCode, err := Judge_Submission(submission.SubmissionID)
+	if err != nil {
+		log.Printf("Failed to judge submission\n" + err.Error())
+	}
+	if statusCode == 200 {
+		submission_after_judge, err := Get_Submission_From_Redis(submission.SubmissionID)
+		if err != nil {
+			log.Printf("Failed to get submission after judge from redis\n" + err.Error())
+		}
+		submission_after_judge_parsed, err := Parse_Submission_From_Redis(submission_after_judge)
+		if err != nil {
+			log.Printf("Failed to parse submission after judge from redis\n" + err.Error())
+		}
+		submission_after_judge_parsed.Status = "done execution"
+		if err = Save_Submission_To_Redis(submission_after_judge_parsed); err != nil {
+			log.Printf("Failed to save judged submission to redis\n" + err.Error())
+		}
+	} else {
+		log.Printf("Failed to judge submission\n" + err.Error())
+	}
+	log.Printf("Done processing submission: %s", submission_id)
 }
 
 func Save_Submission_To_Redis(submission Submission) error {
@@ -352,6 +360,7 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 		WorkingDir: "/app",
 		Cmd:        strings.Split(languages_details[language]["cmd"], "-"),
 	}, &container.HostConfig{
+		AutoRemove: true,
 		Resources: container.Resources{
 			Ulimits: []*units.Ulimit{
 				{
@@ -428,13 +437,14 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 		}
 		out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 		if err != nil {
+			log.Println("Error in getting container logs\n " + err.Error())
 			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
 				Submission_Index: submission_index,
 				Stdout:           "",
-				Stderr:           "Something wrong",
+				Stderr:           "Something wrong " + err.Error(),
 			})
+			return
 		}
-		defer out.Close()
 		stdoutput := new(bytes.Buffer)
 		stderror := new(bytes.Buffer)
 		_, err = stdcopy.StdCopy(stdoutput, stderror, out)
@@ -447,6 +457,7 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 			Stdout:           stdoutput.String(),
 			Stderr:           stderror.String(),
 		})
+		defer out.Close()
 	case <-threading_ctx.Done():
 		return
 	}
@@ -501,4 +512,17 @@ func Judge_Submission(submission_id string) (int, error) {
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode, nil
+}
+
+func SetPrefetchCount(channel *amqp.Channel, prefetch_count int) error {
+	err := channel.Qos(prefetch_count, 0, false)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func PrintMemUsage() {
+	log.Printf("Total system memory: %d\n", memory.TotalMemory())
+	log.Printf("Free memory: %d\n", memory.FreeMemory())
 }
