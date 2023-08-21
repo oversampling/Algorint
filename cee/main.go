@@ -7,10 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -21,7 +23,6 @@ import (
 	"github.com/pbnjay/memory"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
-	"github.com/shirou/gopsutil/cpu"
 )
 
 var supported_languages []string = strings.Split(os.Getenv("SUPPORTED_LANGUAGES"), ",")
@@ -50,28 +51,74 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to initialize docker client\n" + err.Error())
 	}
-	Initialize_Language_Executor(cli)
+	_, err = Initialize_Language_Executor(cli)
+	if err != nil {
+		log.Fatal("Failed to initialize language executor\n" + err.Error())
+		return // Exiting function if there's an error
+	}
 	consume(cli)
 }
 
-func Initialize_Language_Executor(cli *client.Client) {
+func Initialize_Language_Executor(cli *client.Client) (bool, error) {
+	var wg sync.WaitGroup
+	errorChan := make(chan error, len(supported_languages))
+	finishChan := make(chan bool, len(supported_languages))
 	for _, language := range supported_languages {
-		language_details := strings.Split(language, "@")
-		log.Printf("Lanugage details: %s\n", language_details)
-		language_name := language_details[0]
-		language_image := language_details[1]
-		language_cmd := language_details[2]
-		language_extension := language_details[3]
-		languages_details[language_name] = map[string]string{
-			"image":     language_image,
-			"cmd":       language_cmd,
-			"extension": language_extension,
+		wg.Add(1)
+		go func(language string) {
+			defer wg.Done()
+			language_details := strings.Split(language, "@")
+			log.Printf("Lanugage details: %s\n", language_details)
+			language_name := language_details[0]
+			language_image := language_details[1]
+			language_cmd := language_details[2]
+			language_extension := language_details[3]
+			languages_details[language_name] = map[string]string{
+				"image":     language_image,
+				"cmd":       language_cmd,
+				"extension": language_extension,
+			}
+			out, err := cli.ImagePull(context.Background(), language_image, types.ImagePullOptions{})
+			if err != nil {
+				errorChan <- fmt.Errorf("failed to pull image %v: %v", language_image, err.Error())
+				return
+			}
+			defer out.Close()
+			io.Copy(io.Discard, out)
+
+			log.Println("Finished pulling image:", language_image)
+			finishChan <- true // Indicate that image has been pulled successfully
+		}(language)
+	}
+	go func() {
+		wg.Wait()
+		close(errorChan)
+		close(finishChan)
+	}()
+	var errorEncountered error
+	finishedTasks := 0
+	for {
+		select {
+		case err, ok := <-errorChan:
+			if ok && err != nil && errorEncountered == nil { // Only recording the first error
+				errorEncountered = err
+			}
+		case _, ok := <-finishChan:
+			if ok {
+				finishedTasks++
+			}
 		}
-		_, err := cli.ImagePull(context.Background(), language_image, types.ImagePullOptions{})
-		if err != nil {
-			log.Fatal("Failed to pull image\n" + err.Error())
+
+		if finishedTasks == len(supported_languages) || errorEncountered != nil {
+			break
 		}
 	}
+
+	if errorEncountered != nil {
+		return false, errorEncountered
+	}
+
+	return true, nil
 }
 
 func Initialize_Docker_Client() (*client.Client, error) {
@@ -102,6 +149,7 @@ func consume(cli *client.Client) {
 		log.Fatal("Failed to connect to RabbitMQ", err)
 	}
 	defer conn.Close()
+	notify := conn.NotifyClose(make(chan *amqp.Error))
 	ch, err := Initiate_MQ_Channel(conn)
 	if err != nil {
 		log.Fatal("Failed to open a channel", err)
@@ -111,10 +159,13 @@ func consume(cli *client.Client) {
 	if err != nil {
 		log.Fatal("Failed to declare a queue", err)
 	}
+	if err := SetPrefetchCount(ch, 1); err != nil {
+		log.Fatal("Failed to set prefetch count", err)
+	}
 	msgs, err := ch.Consume(
 		queue_name,
-		"",
-		true,
+		"cee",
+		false,
 		false,
 		false,
 		false,
@@ -123,27 +174,28 @@ func consume(cli *client.Client) {
 	if err != nil {
 		log.Fatal("Failed to register a consumer", err)
 	}
-	if err := SetPrefetchCount(ch, 100); err != nil {
-		log.Fatal("Failed to set prefetch count", err)
-	}
 	forever := make(chan bool)
-	go OnMessageReceived(msgs, cli)
+	go OnMessageReceived(msgs, cli, notify)
 	fmt.Println("Running...")
 	<-forever
 }
 
-func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client) {
+func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client, notifyClose <-chan *amqp.Error) {
+	go func() {
+		for err := range notifyClose {
+			log.Printf("AMQP connection closed: %v", err)
+		}
+	}()
 	for d := range msgs {
-		log.Printf("Received a message: %s", d.Body)
-		go Message_Handler(d.Body, cli)
-		log.Printf("Done processing message: %s", d.Body)
+		go Message_Handler(&d, cli)
 	}
 }
 
-func Message_Handler(body []byte, cli *client.Client) {
-	log.Printf("Received a message: %s", body)
-	// d.Ack(true)
+func Message_Handler(d *amqp.Delivery, cli *client.Client) {
+	body := d.Body
 	submission_id, err := Get_Submission_Token_From_MQ(body)
+	startTime := time.Now()
+	log.Printf("Handle a message: %s", submission_id)
 	if err != nil {
 		log.Printf("Error getting submission id from MQ\n" + err.Error())
 	}
@@ -155,11 +207,10 @@ func Message_Handler(body []byte, cli *client.Client) {
 	if err != nil {
 		log.Printf("Failed to parse submission from redis\n" + err.Error())
 	}
-	log.Printf("Submission: %v", submission)
 	execution_channel := make(chan Execution_Result, len(submission.Stdin))
 	threading_ctx, cancel := context.WithCancel(context.Background())
+	log.Printf("Before running code for submission %s", submission_id)
 	for index, code_input := range submission.Stdin {
-		log.Printf("%v Processing input: %v", index, code_input)
 		// base64 decode code_input\
 		code_input_decoded, err := base64.StdEncoding.DecodeString(code_input)
 		if err != nil {
@@ -182,39 +233,29 @@ func Message_Handler(body []byte, cli *client.Client) {
 		}
 		time_limit := submission.TimeLimit[index]
 		mem_limit := submission.MemoryLimit[index]
-		log.Printf("Code: %v", string(code))
-		log.Printf("Time Limit: %v", time_limit)
-		log.Printf("Memory Limit: %v", mem_limit)
-		PrintMemUsage()
-		cpu, _ := cpu.Percent(time.Second, false)
-		log.Printf("CPU: %v\n", cpu)
-		log.Printf("Code Input: %v", string(code_input_decoded))
-		go RunCode(threading_ctx, cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit, index, execution_channel)
+		go RunCode(threading_ctx, cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit, index, execution_channel, submission_id)
 	}
 	submission_results := []Execution_Result{}
 	for i := 0; i < len(submission.Stdin); i++ {
 		submission_result := <-execution_channel
 		submission_results = append(submission_results, submission_result)
-		log.Printf("Submission result %v: %v", i, submission_result)
 	}
 	cancel()
-	log.Printf("Running in main thread..")
+	log.Printf("Done running code for submission %s", submission.SubmissionID)
 	reordered_submission_results := make([]Execution_Result, len(submission_results))
 	for _, result := range submission_results {
-		log.Printf("Submission Result: %v", result)
 		reordered_submission_results[result.Submission_Index] = result
 	}
 	for _, result := range reordered_submission_results {
 		base64_stdout := base64.StdEncoding.EncodeToString([]byte(result.Stdout))
 		base64_stderr := base64.StdEncoding.EncodeToString([]byte(result.Stderr))
-		log.Print("base64_stdout: " + base64_stdout)
-		log.Print("base64_stderr: " + base64_stderr)
 		submission.Stdout = append(submission.Stdout, base64_stdout)
 		submission.Stderr = append(submission.Stderr, base64_stderr)
 	}
 	if err = Save_Submission_To_Redis(submission); err != nil {
 		log.Printf("Failed to save submission to redis\n" + err.Error())
 	}
+	log.Printf("Before Judge Submission for %s", submission.SubmissionID)
 	statusCode, err := Judge_Submission(submission.SubmissionID)
 	if err != nil {
 		log.Printf("Failed to judge submission\n" + err.Error())
@@ -232,10 +273,11 @@ func Message_Handler(body []byte, cli *client.Client) {
 		if err = Save_Submission_To_Redis(submission_after_judge_parsed); err != nil {
 			log.Printf("Failed to save judged submission to redis\n" + err.Error())
 		}
-	} else {
-		log.Printf("Failed to judge submission\n" + err.Error())
+		log.Printf("After Judge Submission Response with updated status for %s", submission.SubmissionID)
 	}
-	log.Printf("Done processing submission: %s", submission_id)
+	elapsedTime := time.Since(startTime)
+	d.Ack(false)
+	log.Printf("Done processing submission: %s with %v", submission_id, elapsedTime.Seconds())
 }
 
 func Save_Submission_To_Redis(submission Submission) error {
@@ -350,9 +392,10 @@ func Initiate_Redis_Client() (*redis.Client, error) {
 	return client, nil
 }
 
-func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_index int, execution_channel chan Execution_Result) {
+func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_index int, execution_channel chan Execution_Result, submission_id string) {
 	ctx := context.Background()
 	// Create a container
+	log.Printf("Create a container for submission %v index %v", submission_id, submission_index)
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:      languages_details[language]["image"],
 		Tty:        false,
@@ -375,6 +418,7 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 	if err != nil {
 		log.Println("Error in creating container\n " + err.Error())
 	}
+	log.Printf("Add file to container for submission %v index %v", submission_id, submission_index)
 	// Copy code to container
 	content, err := Make_Archieve(fmt.Sprintf("code%s", languages_details[language]["extension"]), code)
 	if err != nil {
@@ -386,11 +430,13 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 	if err != nil {
 		log.Println("Error in creating container\n " + err.Error())
 	}
+	log.Printf("Start container for submission %v index %v", submission_id, submission_index)
 	// Start container
 	err = cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		log.Println("Error in creating container\n " + err.Error())
 	}
+	log.Printf("Write input to container for submission %v index %v", submission_id, submission_index)
 	// Write input to container
 	hijackedResponse, err := cli.ContainerAttach(ctx, resp.ID, types.ContainerAttachOptions{
 		Stream: true,
@@ -427,7 +473,6 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 			Stderr:           "Time Limit Exceeded",
 		})
 	case statusCode := <-statusCh:
-		log.Printf("Status Code: %d\n", statusCode.StatusCode)
 		if statusCode.StatusCode == 137 {
 			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
 				Submission_Index: submission_index,
@@ -435,6 +480,7 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 				Stderr:           "Memory Limit Exceeded",
 			})
 		}
+		log.Printf("Get container logs for submission %v index %v", submission_id, submission_index)
 		out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 		if err != nil {
 			log.Println("Error in getting container logs\n " + err.Error())
@@ -451,7 +497,6 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 		if err != nil {
 			log.Println("Error in copying container logs\n " + err.Error())
 		}
-		log.Printf("Stdout: %s\nStderr: %s\n", stdoutput.String(), stderror.String())
 		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
 			Submission_Index: submission_index,
 			Stdout:           stdoutput.String(),
