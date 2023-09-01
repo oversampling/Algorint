@@ -17,6 +17,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-units"
@@ -48,6 +49,7 @@ var languages_details map[string]map[string]string = map[string]map[string]strin
 
 func main() {
 	cli, err := Initialize_Docker_Client()
+	log.Printf("%v", supported_languages)
 	if err != nil {
 		log.Fatal("Failed to initialize docker client\n" + err.Error())
 	}
@@ -71,12 +73,23 @@ func Initialize_Language_Executor(cli *client.Client) (bool, error) {
 			log.Printf("Lanugage details: %s\n", language_details)
 			language_name := language_details[0]
 			language_image := language_details[1]
-			language_cmd := language_details[2]
-			language_extension := language_details[3]
-			languages_details[language_name] = map[string]string{
-				"image":     language_image,
-				"cmd":       language_cmd,
-				"extension": language_extension,
+			language_extension := language_details[2]
+			lanugage_type := language_details[3]
+			if lanugage_type == "compiler" {
+				languages_details[language_name] = map[string]string{
+					"image":     language_image,
+					"compile":   language_details[4],
+					"execute":   language_details[5],
+					"extension": language_extension,
+					"type":      "compiler",
+				}
+			} else {
+				languages_details[language_name] = map[string]string{
+					"image":     language_image,
+					"execute":   language_details[4],
+					"extension": language_extension,
+					"type":      "interpreter",
+				}
 			}
 			out, err := cli.ImagePull(context.Background(), language_image, types.ImagePullOptions{})
 			if err != nil {
@@ -86,7 +99,7 @@ func Initialize_Language_Executor(cli *client.Client) (bool, error) {
 			defer out.Close()
 			io.Copy(io.Discard, out)
 
-			log.Println("Finished pulling image:", language_image)
+			log.Println("Finished pulling image:", language_details)
 			finishChan <- true // Indicate that image has been pulled successfully
 		}(language)
 	}
@@ -392,7 +405,7 @@ func Initiate_Redis_Client() (*redis.Client, error) {
 	return client, nil
 }
 
-func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_index int, execution_channel chan Execution_Result, submission_id string) {
+func executeCode(cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_id string, submission_index int, execution_channel chan Execution_Result, threading_ctx context.Context) {
 	ctx := context.Background()
 	// Create a container
 	log.Printf("Create a container for submission %v index %v", submission_id, submission_index)
@@ -401,7 +414,7 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 		Tty:        false,
 		OpenStdin:  true,
 		WorkingDir: "/app",
-		Cmd:        strings.Split(languages_details[language]["cmd"], "-"),
+		Cmd:        strings.Split(languages_details[language]["execute"], " "),
 	}, &container.HostConfig{
 		AutoRemove: true,
 		Resources: container.Resources{
@@ -431,7 +444,7 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 		log.Println("Error in creating container\n " + err.Error())
 	}
 	log.Printf("Start container for submission %v index %v", submission_id, submission_index)
-	// Start container
+	// Start compiling container
 	err = cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		log.Println("Error in creating container\n " + err.Error())
@@ -505,6 +518,260 @@ func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, inp
 		defer out.Close()
 	case <-threading_ctx.Done():
 		return
+	}
+}
+
+func compileCode(cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_id string, submission_index int, execution_channel chan Execution_Result, threading_ctx context.Context) {
+	ctx := context.Background()
+	volumeName := fmt.Sprintf("submission-%s-%d", submission_id, submission_index)
+	cli.VolumeCreate(ctx, volume.CreateOptions{
+		Name:   volumeName,
+		Driver: "local",
+	})
+	// Create compiling a container
+	log.Printf("Create a container for submission %v index %v", submission_id, submission_index)
+	compilingResp, err := cli.ContainerCreate(ctx, &container.Config{
+		Image:      languages_details[language]["image"],
+		Tty:        false,
+		OpenStdin:  false,
+		WorkingDir: "/app",
+		Cmd:        strings.Split(languages_details[language]["compile"], " "),
+	}, &container.HostConfig{
+		AutoRemove: false,
+		Binds:      []string{fmt.Sprintf("%s:/app", volumeName)},
+		Resources: container.Resources{
+			Ulimits: []*units.Ulimit{
+				{
+					Name: "nproc",
+					Soft: 100,
+					Hard: 1024,
+				},
+			},
+			Memory: int64(mem_limit_mb * 1024 * 1024),
+		},
+	}, nil, nil, "")
+	if err != nil {
+		log.Println("Error in creating container\n " + err.Error())
+	}
+	log.Printf("Add file to compile container for submission %v index %v", submission_id, submission_index)
+	// Copy code to container
+	content, err := Make_Archieve(fmt.Sprintf("code%s", languages_details[language]["extension"]), code)
+	if err != nil {
+		log.Println("Error in creating container\n " + err.Error())
+	}
+	err = cli.CopyToContainer(ctx, compilingResp.ID, "/app", content, types.CopyToContainerOptions{
+		AllowOverwriteDirWithFile: true,
+	})
+	if err != nil {
+		log.Println("Error in creating container\n " + err.Error())
+	}
+	// Start compiling container
+	err = cli.ContainerStart(ctx, compilingResp.ID, types.ContainerStartOptions{})
+	if err != nil {
+		log.Println("Error in starting compiling container\n " + err.Error())
+	}
+	time_limit_ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time_limit)*time.Second)
+	compilingStatusCh, compilingErrCh := cli.ContainerWait(time_limit_ctx, compilingResp.ID, container.WaitConditionNotRunning)
+	// Context with timeout
+	defer cancel()
+	select {
+	case err := <-compilingErrCh:
+		if err != nil {
+			cli.ContainerRemove(ctx, compilingResp.ID, types.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			})
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Sandbox error, try to run again",
+			})
+		}
+	case <-time_limit_ctx.Done():
+		cli.ContainerRemove(ctx, compilingResp.ID, types.ContainerRemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		})
+		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+			Submission_Index: submission_index,
+			Stdout:           "",
+			Stderr:           "Compile Time Limit Exceeded",
+		})
+	case statusCode := <-compilingStatusCh:
+		if statusCode.StatusCode == 137 {
+			cli.ContainerRemove(ctx, compilingResp.ID, types.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			})
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Compile Memory Limit Exceeded",
+			})
+		}
+		if statusCode.StatusCode == 127 {
+			cli.ContainerRemove(ctx, compilingResp.ID, types.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			})
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Compile Error, Invalid Command",
+			})
+		}
+		if statusCode.StatusCode == 1 {
+			log.Printf("Status code: %v", statusCode.StatusCode)
+			log.Printf("Get container logs for submission %v index %v", submission_id, submission_index)
+			out, err := cli.ContainerLogs(ctx, compilingResp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+			if err != nil {
+				log.Println("Error in getting container logs\n " + err.Error())
+				Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+					Submission_Index: submission_index,
+					Stdout:           "",
+					Stderr:           "Error in compiling container " + err.Error(),
+				})
+				return
+			}
+			stdoutput := new(bytes.Buffer)
+			stderror := new(bytes.Buffer)
+			_, err = stdcopy.StdCopy(stdoutput, stderror, out)
+			if err != nil {
+				log.Println("Error in copying container logs\n " + err.Error())
+			}
+			cli.ContainerRemove(ctx, compilingResp.ID, types.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			})
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           stdoutput.String(),
+				Stderr:           stderror.String(),
+			})
+			defer out.Close()
+			return
+		}
+	case <-threading_ctx.Done():
+		return
+	}
+	// Executing code
+	executeResp, err := cli.ContainerCreate(ctx, &container.Config{
+		Image:      languages_details[language]["image"],
+		Tty:        false,
+		OpenStdin:  true,
+		WorkingDir: "/app",
+		Cmd:        strings.Split(languages_details[language]["execute"], " "),
+	}, &container.HostConfig{
+		AutoRemove: false,
+		Binds:      []string{fmt.Sprintf("%s:/app", volumeName)},
+		Resources: container.Resources{
+			Ulimits: []*units.Ulimit{
+				{
+					Name: "nproc",
+					Soft: 100,
+					Hard: 1024,
+				},
+			},
+			Memory: int64(mem_limit_mb * 1024 * 1024),
+		},
+	}, nil, nil, "")
+	if err != nil {
+		log.Println("Error in creating executing container\n " + err.Error())
+	}
+	err = cli.ContainerStart(ctx, executeResp.ID, types.ContainerStartOptions{})
+	if err != nil {
+		log.Println("Error in creating executing container\n " + err.Error())
+	}
+	// Write input to container
+	hijackedResponse, err := cli.ContainerAttach(ctx, executeResp.ID, types.ContainerAttachOptions{
+		Stream: true,
+		Stdin:  true,
+		Stdout: false,
+		Stderr: false,
+	})
+	if err != nil {
+		log.Println("Error in creating container\n " + err.Error())
+	}
+	_, err = hijackedResponse.Conn.Write([]byte(input + "\n"))
+	if err != nil {
+		log.Println("Error in writing input to container\n " + err.Error())
+	}
+	log.Printf("Write input to container for submission %v index %v", submission_id, submission_index)
+	executing_time_limit_ctx, cancel_execute := context.WithTimeout(context.Background(), time.Duration(time_limit)*time.Second)
+	executingStatusCh, executingErrCh := cli.ContainerWait(executing_time_limit_ctx, executeResp.ID, container.WaitConditionNotRunning)
+	defer cancel_execute()
+	select {
+	case err := <-executingErrCh:
+		if err != nil {
+			cli.ContainerRemove(ctx, executeResp.ID, types.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			})
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Sandbox error, try to run again",
+			})
+		}
+	case <-time_limit_ctx.Done():
+		cli.ContainerRemove(ctx, executeResp.ID, types.ContainerRemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		})
+		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+			Submission_Index: submission_index,
+			Stdout:           "",
+			Stderr:           "Run Time Limit Exceeded",
+		})
+	case statusCode := <-executingStatusCh:
+		if statusCode.StatusCode == 137 {
+			cli.ContainerRemove(ctx, executeResp.ID, types.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			})
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           "Run Time Memory Limit Exceeded",
+			})
+		}
+		log.Printf("Get container logs for submission %v index %v", submission_id, submission_index)
+		out, err := cli.ContainerLogs(ctx, executeResp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+		if err != nil {
+			log.Println("Error in getting container logs\n " + err.Error())
+			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+				Submission_Index: submission_index,
+				Stdout:           "",
+				Stderr:           " " + err.Error(),
+			})
+			return
+		}
+		stdoutput := new(bytes.Buffer)
+		stderror := new(bytes.Buffer)
+		_, err = stdcopy.StdCopy(stdoutput, stderror, out)
+		if err != nil {
+			log.Println("Error in copying container logs\n " + err.Error())
+		}
+		cli.ContainerRemove(ctx, executeResp.ID, types.ContainerRemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		})
+		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+			Submission_Index: submission_index,
+			Stdout:           stdoutput.String(),
+			Stderr:           stderror.String(),
+		})
+		defer out.Close()
+	case <-threading_ctx.Done():
+		return
+	}
+}
+
+func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_index int, execution_channel chan Execution_Result, submission_id string) {
+	if languages_details[language]["type"] == "interpreter" {
+		executeCode(cli, code, input, language, time_limit, mem_limit_mb, submission_id, submission_index, execution_channel, threading_ctx)
+	} else {
+		compileCode(cli, code, input, language, time_limit, mem_limit_mb, submission_id, submission_index, execution_channel, threading_ctx)
 	}
 }
 
