@@ -108,5 +108,115 @@
         ]
       }
     ]
+  },
+  {
+    "title": "C Test",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "C assignments",
+        "language": "C",
+        "code_template": "#include <stdio.h>\nint main() {\n\tprintf(\"Hello, World!\");\n\treturn 0;}",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "title": "NodeJS Test",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "NodeJS assignments",
+        "language": "NodeJS",
+        "code_template": "let printstr = \"<replace-1>\";\nconsole.log(printstr)",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "<replace-1>",
+              "to": "hello world"
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "<replace-1>",
+              "to": "hello world"
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "Hello World",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "<replace-1>",
+              "to": "hello world"
+            }]
+          }
+        ]
+      }
+    ]
   }
 ]
