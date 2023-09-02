@@ -30,6 +30,10 @@ cd submission_database
 kubectl apply -f ./kubernetes/redis-namespace.yml
 kubectl apply -f ./kubernetes/redis-configmap.yml
 kubectl apply -f ./kubernetes/redis.yml
+kubectl wait --namespace redis \
+  --for=condition=ready pod \
+  --selector=app=redis \
+  --timeout=90s
 kubectl apply -f ./kubernetes/sentinels.yml # Wait redis finish running before run sentinels
 ```
 
@@ -63,6 +67,11 @@ kubectl apply -f ./kubernetes/mongo-deployment.yml
 cd monitoring
 kubectl create -f ./manifests/setup/
 kubectl create -f ./manifests/
+
+kubectl delete -f ./manifests/
+kubectl delete -f ./manifests/setup
+
+kubectl delete --ignore-not-found=true -f manifests/ -f manifests/setup
 
 # Prometheus
 kubectl -n monitoring port-forward svc/prometheus-operated 9090
