@@ -402,5 +402,121 @@
         ]
       }
     ]
+  },
+  {
+    "title": "CPP Program without error",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "CPP assignments",
+        "language": "cpp",
+        "code_template": "#include <iostream>\n#include <string>\n#include <vector>\nusing namespace std;\n\nvoid solve(string str, int strlen, int noOftestCase){\n    int counter = 1;\n    cout << \"Case #\" << noOftestCase +1<< \": \";\n    for (int i = 0; i < strlen - 1; i++){\n        cout << counter << \" \";\n        if (str[i] < str[i+1]){\n            counter++;\n        }else counter = 1;\n    }\n    cout << counter << endl;\n}\n\nint main(){\n    int noOfTestCase, strlengthHold;\n    string strHold;\n    vector<int> strlength;\n    vector<string> str;\n    cin >> noOfTestCase;\n    cin.ignore();\n    for (int i =0 ;i<noOfTestCase; i++){\n        cin >> strlengthHold;\n        cin.ignore();\n        strlength.push_back(strlengthHold);\n        cin >> strHold;\n        cin.ignore();\n        str.push_back(strHold);\n        solve(str[i], strlength[i], i);\n    }\n}\n\n",
+        "test_cases": [
+          {
+            "stdin": "2\n4\nABBC\n6\nABACDA",
+            "isHidden": false,
+            "stdout": "Case #1: 1 2 1 2\nCase #2: 1 2 1 2 3 1",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "title": "CPP Program with syntax error (Compile Time Error)",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "CPP assignments",
+        "language": "cpp",
+        "code_template": "#include <iostream>\nusing namespace std;\n\nint main(){\n    int a[5];\n    for (int i = 0; i < 5; i++){\n        cout << a[i] << endl;\n    }\n    cout << a[6] << endl;\n}\n",
+        "test_cases": [
+          {
+            "stdin": "2\n4\nABBC\n6\nABACDA",
+            "isHidden": false,
+            "stdout": "Case #1: 1 2 1 2\nCase #2: 1 2 1 2 3 1",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "title": "CPP Runtime Error (Index Out of Range)",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "CPP assignments",
+        "language": "cpp",
+        "code_template": "#include <iostream>\nusing namespace std;\n\nint main(){\n    int a[5];\n    for (int i = 0; i < 5; i++){\n        cout << a[i] << endl;\n    }\n    cout << a[6] << endl;\n}\n",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "5",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "title": "CPP Resources Error (Time Limit -- Fork Bomb)",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "CPP assignments",
+        "language": "cpp",
+        "code_template": "#include <cstdlib>\nint main(int argc, char **argv)\n{\n    while (1)\n        system(argv[0]);\n    return 0;\n}\n",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "5",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
   }
 ]
