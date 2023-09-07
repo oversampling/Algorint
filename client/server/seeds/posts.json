@@ -165,7 +165,7 @@
     ]
   },
   {
-    "title": "NodeJS Test",
+    "title": "NodeJS Test without error",
     "description": "This is a test",
     "isPublic": true,
     "publishDate": "2019-01-01T00:00:00.000Z",
@@ -506,6 +506,77 @@
             "stdin": "",
             "isHidden": false,
             "stdout": "5",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "title": "NodeJS Test with logical error",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "NodeJS assignments",
+        "language": "nodejs",
+        "code_template": "let n;\nlet arr = [\"<replace-1>\"];\n\narr = [...new Set(arr)];\narr.sort((a, b) => b - a);\nconsole.log(arr[0]);\n",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "-57",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "\"<replace-1>\"",
+              "to": "57, 57, -57, 57"
+            }]
+          },
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "5",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "\"<replace-1>\"",
+              "to": "5, 5, 5, 5, 5, 5, 5, 5, 5, 6"
+            }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "title": "NodeJS Test with resources error",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "NodeJS assignments",
+        "language": "nodejs",
+        "code_template": "(function f() {\n    require('child_process').spawn(\n        process.argv[0],\n        ['-e', '(' + f.toString() + '());'])\n    ;}()\n);\n",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "",
             "configuration": {
               "time_limit": 2,
               "memory_limit": 100
