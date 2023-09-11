@@ -45,7 +45,7 @@ data:
   SUBMISSION_QUEUE: amqp://submission-queue.submission-queue.svc.cluster.local:5672/
   REDIS_HOST: redis.redis.svc.cluster.local
   CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
-  SUPPORTED_LANGUAGES: python@python:alpine3.16@.py@interpreter@python code.py,nodejs@node:alpine3.18@.js@interpreter@node code.js,c@frolvlad/alpine-gxx@.c@compiler@gcc --static code.c -o code@./code,cpp@frolvlad/alpine-gxx@.cpp@compiler@c++ --static code.cpp -o code@./code
+  SUPPORTED_LANGUAGES: python@python:alpine3.16@.py@interpreter@python code.py,nodejs@node:alpine3.18@.js@interpreter@node code.js,c@frolvlad/alpine-gxx@.c@compiler@gcc --static code.c -o code@./code,cpp@frolvlad/alpine-gxx@.cpp@compiler@c++ --static code.cpp -o code@./code,rust@frolvlad/alpine-rust@.rs@compiler@rustc -C target-feature=+crt-static code.rs -o code@./code
   ENVIRONMENT: development
 ---
 apiVersion: keda.sh/v1alpha1
