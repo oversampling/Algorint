@@ -223,7 +223,10 @@ func Message_Handler(d *amqp.Delivery, cli *client.Client) {
 	execution_channel := make(chan Execution_Result, len(submission.Stdin))
 	threading_ctx, cancel := context.WithCancel(context.Background())
 	log.Printf("Before running code for submission %s", submission_id)
+	// Set Max number of goroutines
+	guard := make(chan struct{}, 2)
 	for index, code_input := range submission.Stdin {
+		guard <- struct{}{} // would block if guard channel is already filled
 		// base64 decode code_input\
 		code_input_decoded, err := base64.StdEncoding.DecodeString(code_input)
 		if err != nil {
@@ -246,7 +249,10 @@ func Message_Handler(d *amqp.Delivery, cli *client.Client) {
 		}
 		time_limit := submission.TimeLimit[index]
 		mem_limit := submission.MemoryLimit[index]
-		go RunCode(threading_ctx, cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit, index, execution_channel, submission_id)
+		go func(index int) {
+			RunCode(threading_ctx, cli, code, string(code_input_decoded), submission.Language, time_limit, mem_limit, index, execution_channel, submission_id)
+			<-guard // read from the guard channel, allows another iteration to proceed
+		}(index)
 	}
 	submission_results := []Execution_Result{}
 	for i := 0; i < len(submission.Stdin); i++ {
@@ -343,6 +349,7 @@ func Initiate_Docker_Client() (*client.Client, error) {
 
 func Initiate_MQ_Client() (*amqp.Connection, error) {
 	var rabbitmq_url string = injectUsernamePasswordToRabbitMQURL(submission_queue, rabbitmq_username, rabbit_password)
+	log.Printf("RabbitMQ URL: %s", rabbitmq_url)
 	conn, err := amqp.Dial(rabbitmq_url)
 	if err != nil {
 		return nil, err
@@ -416,13 +423,13 @@ func executeCode(cli *client.Client, code []byte, input string, language string,
 		WorkingDir: "/app",
 		Cmd:        strings.Split(languages_details[language]["execute"], " "),
 	}, &container.HostConfig{
-		AutoRemove: true,
+		AutoRemove: false,
 		Resources: container.Resources{
 			Ulimits: []*units.Ulimit{
 				{
 					Name: "nproc",
-					Soft: 100,
-					Hard: 1024,
+					Soft: 1024,
+					Hard: 2048,
 				},
 			},
 			Memory: int64(mem_limit_mb * 1024 * 1024),
@@ -478,12 +485,18 @@ func executeCode(cli *client.Client, code []byte, input string, language string,
 				Stderr:           "Sandbox error, try to run again",
 			})
 		}
+		cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{
+			Force: true,
+		})
 	case <-time_limit_ctx.Done():
 		cli.ContainerStop(ctx, resp.ID, container.StopOptions{})
 		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
 			Submission_Index: submission_index,
 			Stdout:           "",
 			Stderr:           "Time Limit Exceeded",
+		})
+		cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{
+			Force: true,
 		})
 	case statusCode := <-statusCh:
 		if statusCode.StatusCode == 137 {
@@ -510,6 +523,9 @@ func executeCode(cli *client.Client, code []byte, input string, language string,
 		if err != nil {
 			log.Println("Error in copying container logs\n " + err.Error())
 		}
+		cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{
+			Force: true,
+		})
 		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
 			Submission_Index: submission_index,
 			Stdout:           stdoutput.String(),
@@ -517,6 +533,9 @@ func executeCode(cli *client.Client, code []byte, input string, language string,
 		})
 		defer out.Close()
 	case <-threading_ctx.Done():
+		cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{
+			Force: true,
+		})
 		return
 	}
 }
@@ -543,8 +562,8 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 			Ulimits: []*units.Ulimit{
 				{
 					Name: "nproc",
-					Soft: 100,
-					Hard: 1024,
+					Soft: 1024,
+					Hard: 2048,
 				},
 			},
 			Memory: int64(mem_limit_mb * 1024 * 1024),
@@ -570,8 +589,9 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 	if err != nil {
 		log.Println("Error in starting compiling container\n " + err.Error())
 	}
-	time_limit_ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time_limit)*time.Second)
-	compilingStatusCh, compilingErrCh := cli.ContainerWait(time_limit_ctx, compilingResp.ID, container.WaitConditionNotRunning)
+	// Wait for container to running
+	compile_time_ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
+	compilingStatusCh, compilingErrCh := cli.ContainerWait(compile_time_ctx, compilingResp.ID, container.WaitConditionNotRunning)
 	// Context with timeout
 	defer cancel()
 	select {
@@ -581,13 +601,14 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 				Force:         true,
 				RemoveVolumes: true,
 			})
+			log.Printf("Error in compiling container\n " + err.Error())
 			Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
 				Submission_Index: submission_index,
 				Stdout:           "",
-				Stderr:           "Sandbox error, try to run again",
+				Stderr:           "Time Limit Exceeded",
 			})
 		}
-	case <-time_limit_ctx.Done():
+	case <-compile_time_ctx.Done():
 		cli.ContainerRemove(ctx, compilingResp.ID, types.ContainerRemoveOptions{
 			Force:         true,
 			RemoveVolumes: true,
@@ -678,11 +699,13 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 	if err != nil {
 		log.Println("Error in creating executing container\n " + err.Error())
 	}
+	log.Printf("Start executing container for submission %v index %v", submission_id, submission_index)
 	err = cli.ContainerStart(ctx, executeResp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		log.Println("Error in creating executing container\n " + err.Error())
 	}
 	// Write input to container
+	log.Printf("Attach executing container for submission %v index %v", submission_id, submission_index)
 	hijackedResponse, err := cli.ContainerAttach(ctx, executeResp.ID, types.ContainerAttachOptions{
 		Stream: true,
 		Stdin:  true,
@@ -692,6 +715,7 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 	if err != nil {
 		log.Println("Error in creating container\n " + err.Error())
 	}
+	log.Printf("Attach executing container for submission %v index %v", submission_id, submission_index)
 	_, err = hijackedResponse.Conn.Write([]byte(input + "\n"))
 	if err != nil {
 		log.Println("Error in writing input to container\n " + err.Error())
@@ -713,7 +737,7 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 				Stderr:           "Sandbox error, try to run again",
 			})
 		}
-	case <-time_limit_ctx.Done():
+	case <-executing_time_limit_ctx.Done():
 		cli.ContainerRemove(ctx, executeResp.ID, types.ContainerRemoveOptions{
 			Force:         true,
 			RemoveVolumes: true,
@@ -756,6 +780,11 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 			Force:         true,
 			RemoveVolumes: true,
 		})
+		cli.ContainerRemove(ctx, compilingResp.ID, types.ContainerRemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		})
+		cli.VolumeRemove(ctx, volumeName, true)
 		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
 			Submission_Index: submission_index,
 			Stdout:           stdoutput.String(),
@@ -770,8 +799,14 @@ func compileCode(cli *client.Client, code []byte, input string, language string,
 func RunCode(threading_ctx context.Context, cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_index int, execution_channel chan Execution_Result, submission_id string) {
 	if languages_details[language]["type"] == "interpreter" {
 		executeCode(cli, code, input, language, time_limit, mem_limit_mb, submission_id, submission_index, execution_channel, threading_ctx)
-	} else {
+	} else if languages_details[language]["type"] == "compiler" {
 		compileCode(cli, code, input, language, time_limit, mem_limit_mb, submission_id, submission_index, execution_channel, threading_ctx)
+	} else {
+		Put_Execution_Result_To_Channel(execution_channel, Execution_Result{
+			Submission_Index: submission_index,
+			Stdout:           "",
+			Stderr:           "Unsupported language",
+		})
 	}
 }
 
