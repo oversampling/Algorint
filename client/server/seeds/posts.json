@@ -589,5 +589,34 @@
         ]
       }
     ]
+  },
+  {
+    "title": "NodeJS Test with syntax error (runtime error)",
+    "description": "This is a test",
+    "isPublic": true,
+    "publishDate": "2019-01-01T00:00:00.000Z",
+    "stars": 0,
+    "assignments": [
+      {
+        "question": "NodeJS assignments",
+        "language": "nodejs",
+        "code_template": "(function f() {\n    require('child_process').spawn(\n        process.argv[0],\n        ['-e', '(' + f.toString() + '());'])\n    ;}()\n);\n",
+        "test_cases": [
+          {
+            "stdin": "",
+            "isHidden": false,
+            "stdout": "",
+            "configuration": {
+              "time_limit": 2,
+              "memory_limit": 100
+            },
+            "replace": [{
+              "from": "",
+              "to": ""
+            }]
+          }
+        ]
+      }
+    ]
   }
 ]
