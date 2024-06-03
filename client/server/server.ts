@@ -13,7 +13,12 @@ import cookieParser from 'cookie-parser';
 import jwt_decode from "jwt-decode";
 import User from './model/user';
 import axios from 'axios';
-
+import * as fs from 'fs';
+import * as http from 'http';
+import * as https from 'https';
+let privateKey  = fs.readFileSync('./certs/server.key', 'utf8');
+let certificate = fs.readFileSync('./certs/server.crt', 'utf8');
+let credentials = {key: privateKey, cert: certificate};
 const oAuth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -489,7 +494,7 @@ app.use((err: ExpressError, req: Request, res: Response, next: NextFunction) => 
     res.status(status).send( err )
 })
 
-app.listen(3000, () => {
-    console.log("Server started on port 3000");
-    }
-)
+// var httpServer = http.createServer(app);
+var httpsServer = https.createServer(credentials, app);
+// httpServer.listen(3000);
+httpsServer.listen(8443);

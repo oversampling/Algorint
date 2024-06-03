@@ -3,3 +3,4 @@ Dockerfile
 .dockerignore
 node_modules
 /server/node_modules
+*/certs/*
