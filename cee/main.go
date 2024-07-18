@@ -38,14 +38,32 @@ var redis_sentinel_address string = strings.TrimSpace(os.Getenv("REDIS_SENTINELS
 // TODO: remember to change this to the correct queue name
 var queue_name string = strings.TrimSpace(os.Getenv("CEE_INTERPRETER_QUEUE_NAME"))
 
-var redis_client = redis.NewFailoverClient(&redis.FailoverOptions{
-	MasterName:    "mymaster",
-	SentinelAddrs: []string{redis_sentinel_address + ":5000"},
-	Password:      redis_password,
-})
-
 // language_details[language_name]["image"/"cmd"]
 var languages_details map[string]map[string]string = map[string]map[string]string{}
+
+func Initiate_Redis_Client() (*redis.Client, error) {
+	context := context.Background()
+	var redisClient *redis.Client
+	if os.Getenv("ENVIRONMENT") == "production" {
+		redis_host := os.Getenv("REDIS_HOST")
+		redisClient = redis.NewClient(&redis.Options{
+			Addr:     redis_host + ":6379",
+			Password: redis_password,
+			DB:       0,
+		})
+	} else {
+		redisClient = redis.NewFailoverClient(&redis.FailoverOptions{
+			MasterName:    "mymaster",
+			SentinelAddrs: []string{redis_sentinel_address + ":5000"},
+			Password:      redis_password,
+		})
+	}
+	_, err := redisClient.Ping(context).Result()
+	if err != nil {
+		return nil, err
+	}
+	return redisClient, nil
+}
 
 func main() {
 	cli, err := Initialize_Docker_Client()
@@ -58,7 +76,11 @@ func main() {
 		log.Fatal("Failed to initialize language executor\n" + err.Error())
 		return // Exiting function if there's an error
 	}
-	consume(cli)
+	redis_client, err := Initiate_Redis_Client()
+	if err != nil {
+		log.Fatal("Failed to initialize redis client\n" + err.Error())
+	}
+	consume(cli, redis_client)
 }
 
 func Initialize_Language_Executor(cli *client.Client) (bool, error) {
@@ -156,7 +178,7 @@ func injectUsernamePasswordToRabbitMQURL(rabbitMQURL string, rabbitMQUsername st
 	return rabbitMQURL
 }
 
-func consume(cli *client.Client) {
+func consume(cli *client.Client, redis_client *redis.Client) {
 	conn, err := Initiate_MQ_Client()
 	if err != nil {
 		log.Fatal("Failed to connect to RabbitMQ", err)
@@ -188,23 +210,23 @@ func consume(cli *client.Client) {
 		log.Fatal("Failed to register a consumer", err)
 	}
 	forever := make(chan bool)
-	go OnMessageReceived(msgs, cli, notify)
+	go OnMessageReceived(msgs, cli, notify, redis_client)
 	fmt.Println("Running...")
 	<-forever
 }
 
-func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client, notifyClose <-chan *amqp.Error) {
+func OnMessageReceived(msgs <-chan amqp.Delivery, cli *client.Client, notifyClose <-chan *amqp.Error, redis_client *redis.Client) {
 	go func() {
 		for err := range notifyClose {
 			log.Printf("AMQP connection closed: %v", err)
 		}
 	}()
 	for d := range msgs {
-		go Message_Handler(&d, cli)
+		go Message_Handler(&d, cli, redis_client)
 	}
 }
 
-func Message_Handler(d *amqp.Delivery, cli *client.Client) {
+func Message_Handler(d *amqp.Delivery, cli *client.Client, redis_client *redis.Client) {
 	body := d.Body
 	submission_id, err := Get_Submission_Token_From_MQ(body)
 	startTime := time.Now()
@@ -212,7 +234,7 @@ func Message_Handler(d *amqp.Delivery, cli *client.Client) {
 	if err != nil {
 		log.Printf("Error getting submission id from MQ\n" + err.Error())
 	}
-	result, err := Get_Submission_From_Redis(submission_id)
+	result, err := Get_Submission_From_Redis(redis_client, submission_id)
 	if err != nil {
 		log.Printf("Failed to get submission from redis\n" + err.Error())
 	}
@@ -271,7 +293,7 @@ func Message_Handler(d *amqp.Delivery, cli *client.Client) {
 		submission.Stdout = append(submission.Stdout, base64_stdout)
 		submission.Stderr = append(submission.Stderr, base64_stderr)
 	}
-	if err = Save_Submission_To_Redis(submission); err != nil {
+	if err = Save_Submission_To_Redis(submission, redis_client); err != nil {
 		log.Printf("Failed to save submission to redis\n" + err.Error())
 	}
 	log.Printf("Before Judge Submission for %s", submission.SubmissionID)
@@ -280,7 +302,7 @@ func Message_Handler(d *amqp.Delivery, cli *client.Client) {
 		log.Printf("Failed to judge submission\n" + err.Error())
 	}
 	if statusCode == 200 {
-		submission_after_judge, err := Get_Submission_From_Redis(submission.SubmissionID)
+		submission_after_judge, err := Get_Submission_From_Redis(redis_client, submission.SubmissionID)
 		if err != nil {
 			log.Printf("Failed to get submission after judge from redis\n" + err.Error())
 		}
@@ -289,7 +311,7 @@ func Message_Handler(d *amqp.Delivery, cli *client.Client) {
 			log.Printf("Failed to parse submission after judge from redis\n" + err.Error())
 		}
 		submission_after_judge_parsed.Status = "done execution"
-		if err = Save_Submission_To_Redis(submission_after_judge_parsed); err != nil {
+		if err = Save_Submission_To_Redis(submission_after_judge_parsed, redis_client); err != nil {
 			log.Printf("Failed to save judged submission to redis\n" + err.Error())
 		}
 		log.Printf("After Judge Submission Response with updated status for %s", submission.SubmissionID)
@@ -299,7 +321,7 @@ func Message_Handler(d *amqp.Delivery, cli *client.Client) {
 	log.Printf("Done processing submission: %s with %v", submission_id, elapsedTime.Seconds())
 }
 
-func Save_Submission_To_Redis(submission Submission) error {
+func Save_Submission_To_Redis(submission Submission, redis_client *redis.Client) error {
 	ctx := context.Background()
 	submission_json, err := json.Marshal(submission)
 	if err != nil {
@@ -321,7 +343,7 @@ func Get_Submission_Token_From_MQ(body []byte) (string, error) {
 	return submission_token.Submission_Id, nil
 }
 
-func Get_Submission_From_Redis(submission_token string) (string, error) {
+func Get_Submission_From_Redis(redis_client *redis.Client, submission_token string) (string, error) {
 	ctx := context.Background()
 	val, err := redis_client.Get(ctx, submission_token).Result()
 	if err != nil {
@@ -380,7 +402,7 @@ func Initiate_MQ_Channel(conn *amqp.Connection) (*amqp.Channel, error) {
 	return ch, nil
 }
 
-func Set_Data_To_Redis(key string, value string) error {
+func Set_Data_To_Redis(redis_client *redis.Client, key string, value string) error {
 	ctx := context.Background()
 	err := redis_client.Set(ctx, key, value, 0).Err()
 	if err != nil {
@@ -389,27 +411,13 @@ func Set_Data_To_Redis(key string, value string) error {
 	return nil
 }
 
-func Get_Data_From_Redis(key string) (string, error) {
+func Get_Data_From_Redis(redis_client *redis.Client, key string) (string, error) {
 	ctx := context.Background()
 	val, err := redis_client.Get(ctx, key).Result()
 	if err != nil {
 		return "", err
 	}
 	return val, nil
-}
-
-func Initiate_Redis_Client() (*redis.Client, error) {
-	context := context.Background()
-	client := redis.NewClient(&redis.Options{
-		Addr:     redis_sentinel_address + ":5000",
-		Password: redis_password,
-		DB:       0,
-	})
-	_, err := client.Ping(context).Result()
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
 }
 
 func executeCode(cli *client.Client, code []byte, input string, language string, time_limit int, mem_limit_mb int, submission_id string, submission_index int, execution_channel chan Execution_Result, threading_ctx context.Context) {
