@@ -1,0 +1,74 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: router
+  labels:
+    name: router
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router-service
+  namespace: router
+spec:
+  selector:
+    app: router-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+      name:
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: router-app
+  name: router-app
+  namespace: router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: router-app
+  template:
+    metadata:
+      labels:
+        app: router-app
+    spec:
+      containers:
+        - name: router-app
+          image: chan1992241/router:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: router-configmap
+            - secretRef:
+                name: router-secrets
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router-configmap
+  namespace: router
+data:
+  CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
+  CEE_COMPILER_QUEUE_NAME: cee-compiler-queue
+  ENVIRONMENT: production
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: router-secrets
+  namespace: router
+type: Opaque
+data:
+  REDIS_HOST: cmVkaXMtc2VydmljZS5yZWRpcy5zdmMuY2x1c3Rlci5sb2NhbA==
+  SUBMISSION_QUEUE: YW1xcDovL3N1Ym1pc3Npb24tcXVldWUuc3VibWlzc2lvbi1xdWV1ZS5zdmMuY2x1c3Rlci5sb2NhbDo1Njcy
+  RABBITMQ_USERNAME: Z3Vlc3Q=
+  RABBITMQ_PASSWORD: Z3Vlc3Q=
