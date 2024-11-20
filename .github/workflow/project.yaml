@@ -76,7 +76,12 @@ jobs:
       run: |
         kubectl apply --server-side -f keda-2.11.0.yaml
         kubectl apply -f cee-aws.yml
-    
+
+    - name: Deploy Judge
+      working-directory: ${{ github.workspace }}/judge/kubernetes/deployment
+      run: |
+        kubectl apply -f judge-aws.yml
+        
     - name: Deploy Client
       working-directory: ${{ github.workspace }}/client/kubernetes/deployment
       run: |
