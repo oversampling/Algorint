@@ -1,0 +1,79 @@
+name: 1. Cluster Initialization
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: Environment
+        options: 
+        - staging
+      project:
+        type: choice
+        description: Project
+        options:
+        - algorint
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  cluster:
+    name: 'Cluster Initialization'
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+        
+    - name: 'Setup NodeJS'
+      uses: actions/setup-node@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      
+    - name: Kubectl tool installer
+      uses: Azure/setup-kubectl@v4.0.0
+      with:
+        version: latest
+
+    - name: Configure AWS Credentials 
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-southeast-1
+        
+    - name: Plan Terraform
+      working-directory: ${{ github.workspace }}/terraform
+      id: plan
+      run: |
+        terraform init
+        terraform workspace select -or-create ${{ env.ENVIRONMENT }}-${{ env.PROJECT }} 
+        terraform plan 
+
+    - name: Apply Terraform
+      working-directory: ${{ github.workspace }}/terraform
+      run: |
+        terraform apply -auto-approve
+
+    - name: Install eksctl
+      run: |
+        ARCH=amd64
+        PLATFORM=$(uname -s)_$ARCH
+        curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$PLATFORM.tar.gz"
+        curl -sL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_checksums.txt" | grep $PLATFORM | sha256sum --check
+        tar -xzf eksctl_$PLATFORM.tar.gz -C /tmp && rm eksctl_$PLATFORM.tar.gz
+        sudo mv /tmp/eksctl /usr/local/bin
+
+    - name: Configure AWS Load Balancer Controller EKS
+      working-directory: ${{ github.workspace }}/terraform/iam
+      run: |
+        aws eks --region ap-southeast-1 update-kubeconfig --name eks-cluster
+        aws iam create-policy --policy-name AWSLoadBalancerControllerIAMPolicy --policy-document file://AWSLoadBalancerController.json
+        eksctl create iamserviceaccount --cluster=eks-cluster --namespace=kube-system --name=aws-load-balancer-controller --role-name AmazonEKSLoadBalancerControllerRole --attach-policy-arn=arn:aws:iam::999229353546:policy/AWSLoadBalancerControllerIAMPolicy --approve
+        export VPC_ID=$(aws eks describe-cluster \
+            --name eks-cluster \
+            --query "cluster.resourcesVpcConfig.vpcId" \
+            --output text)
+        helm repo add eks https://aws.github.io/eks-charts
+        helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=ap-southeast-1 --set clusterName=eks-cluster -n kube-system --set serviceAccount.create=false --set serviceAccount.name=aws-load-balancer-controller --set vpcId=$VPC_ID
