@@ -46,6 +46,8 @@ def enqueue_submission(data, queue_name):
         queue_channel.queue_declare(queue=queue_name, durable=True)
         queue_channel.basic_publish(exchange='',
                                     routing_key=queue_name,
+                                    properties=pika.BasicProperties(
+                                        expiration='600000'),
                                     body=json.dumps(data))
         connection.close()
     elif (os.getenv("ENVIRONMENT") == "production"):
@@ -127,7 +129,7 @@ def make_submission():
         "status": "pending",
         "language": language,
         "code": code,
-        "input": input,
+        "stdin": input,
         "test_cases": test_cases,
         "replace": replace,
         "submission_id": submission_id,

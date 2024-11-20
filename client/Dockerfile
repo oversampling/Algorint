@@ -37,6 +37,6 @@ EXPOSE 3000
 
 COPY --from=builder /app/dist /app/dist
 
-RUN wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
+# RUN wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
 
 CMD ["npm", "run", "start"]

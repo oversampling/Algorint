@@ -1,17 +1,23 @@
-FROM python:alpine3.17
+FROM golang:1.20-alpine as build
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
-COPY requirements.txt /app
+# pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
+COPY go.mod go.sum ./
 
-RUN pip install -r requirements.txt
+RUN go mod download && go mod verify
 
-COPY . /app
+COPY . .
 
-EXPOSE 8080
+# build all the packages in the current directory and its subdirectories
+RUN go build -o /usr/local/bin/app ./...
+
+FROM alpine:latest as runtime
 
 ENV PORT=8080
 
-ENTRYPOINT [ "python" ]
+EXPOSE 8080
 
-CMD [ "main.py" ]
+COPY --from=build /usr/local/bin/app /app
+
+CMD [ "/app" ]

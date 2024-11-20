@@ -1,3 +1,9 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: router
+  labels:
+    name: router
 ---
 apiVersion: v1
 kind: Service
@@ -53,6 +59,16 @@ metadata:
 data:
   CEE_INTERPRETER_QUEUE_NAME: cee-intrepreter-queue
   CEE_COMPILER_QUEUE_NAME: cee-compiler-queue
-  SUBMISSION_QUEUE: amqp://submission-queue.submission-queue.svc.cluster.local:5672/
-  REDIS_SENTINELS: sentinel.redis.svc.cluster.local
-  ENVIRONMENT: development
+  ENVIRONMENT: production
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: router-secrets
+  namespace: router
+type: Opaque
+data:
+  REDIS_HOST: cmVkaXMtc2VydmljZS5yZWRpcy5zdmMuY2x1c3Rlci5sb2NhbA==
+  SUBMISSION_QUEUE: YW1xcDovL3N1Ym1pc3Npb24tcXVldWUuc3VibWlzc2lvbi1xdWV1ZS5zdmMuY2x1c3Rlci5sb2NhbDo1Njcy
+  RABBITMQ_USERNAME: Z3Vlc3Q=
+  RABBITMQ_PASSWORD: Z3Vlc3Q=
