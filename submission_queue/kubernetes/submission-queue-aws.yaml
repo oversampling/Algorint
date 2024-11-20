@@ -1,0 +1,104 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: algorint-rabbitmq-ebs
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp2
+  fsType: ext4
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: submission-queue
+  labels:
+    name: submission-queue
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: submission-queue
+  namespace: submission-queue
+spec:
+  type: ClusterIP
+  selector:
+    app: submission-queue
+  ports:
+    - name: http
+      protocol: TCP
+      port: 15672
+      targetPort: 15672
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: 5672
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: submission-queue-configmap
+  namespace: submission-queue
+data:
+  PLACEHOLDER: "NONE"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: submission-queue-pvc
+  namespace: submission-queue
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: algorint-rabbitmq-ebs
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: submission-queue-secret
+  namespace: submission-queue
+stringData:
+  PLACEHOLDER: "NONE"
+type: Opaque
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: submission-queue
+  namespace: submission-queue
+spec:
+  serviceName: "not-applicable"
+  selector:
+    matchLabels:
+      app: submission-queue
+  template:
+    metadata:
+      labels:
+        app: submission-queue
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+          ports:
+            - name: http
+              protocol: TCP
+              containerPort: 15672
+            - name: amqp
+              protocol: TCP
+              containerPort: 5672
+          envFrom:
+            - configMapRef:
+                name: submission-queue-configmap
+            - secretRef:
+                name: submission-queue-secret
+          volumeMounts:
+            - mountPath: "/var/lib/rabbitmq"
+              name: submission-queue-volume
+      volumes:
+        - name: submission-queue-volume
+          persistentVolumeClaim:
+            claimName: submission-queue-pvc

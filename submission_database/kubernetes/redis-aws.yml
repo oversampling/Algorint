@@ -1,3 +1,14 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: algorint-redis-ebs
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp2
+  fsType: ext4
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
 kind: Namespace
 apiVersion: v1
 metadata:
@@ -6,11 +17,12 @@ metadata:
     name: redis
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: redis-deployment
+  name: redis
   namespace: redis
 spec:
+  serviceName: redis-service
   replicas: 1
   selector:
     matchLabels:
@@ -25,6 +37,25 @@ spec:
         image: redis:alpine
         ports:
         - containerPort: 6379
+        resources:
+          requests:
+            memory: "0.5Gi"
+            cpu: "0.5"
+          limits:
+            memory: "0.5Gi"
+            cpu: "0.5"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: algorint-redis-ebs
+      resources:
+        requests:
+          storage: 0.5Gi
 ---
 apiVersion: v1
 kind: Service

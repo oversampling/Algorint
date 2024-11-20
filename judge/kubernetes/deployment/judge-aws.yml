@@ -1,0 +1,70 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: judge
+  labels:
+    name: judge
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: judge
+  namespace: judge
+spec:
+  type: ClusterIP
+  selector:
+    app: judge-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+      name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: judge-app
+  name: judge-app
+  namespace: judge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: judge-app
+  template:
+    metadata:
+      labels:
+        app: judge-app
+    spec:
+      containers:
+        - name: judge-app
+          image: chan1992241/judge:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: judge-secrets
+            - configMapRef:
+                name: judge-configmap
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: judge-configmap
+  namespace: judge
+data:
+  ENVIRONMENT: production
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: judge-secrets
+  namespace: judge
+type: Opaque
+stringData:
+  REDIS_HOST: redis-service.redis.svc.cluster.local 
+

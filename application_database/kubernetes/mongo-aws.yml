@@ -1,0 +1,67 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp2-custom
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp2
+  fsType: ext4
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: mongo
+  labels:
+    name: mongo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  namespace: mongo
+spec:
+  type: ClusterIP
+  selector:
+    app: mongo
+  ports:
+    - name: http
+      protocol: TCP
+      port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: mongo
+spec:
+  serviceName: mongo
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:latest
+          ports:
+            - name: http
+              protocol: TCP
+              containerPort: 27017
+          volumeMounts:
+            - mountPath: /data/db
+              name: mongo-volume
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-volume
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: gp2-custom
