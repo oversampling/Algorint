@@ -68,6 +68,7 @@ jobs:
     - name: Destroy IRSA
       run: |
         eksctl delete iamserviceaccount --name=aws-load-balancer-controller --namespace=kube-system --cluster=eks-cluster --wait
+        aws iam delete-policy --policy-arn arn:aws:iam::999229353546:policy/AWSLoadBalancerControllerIAMPolicy
 
     - name: Plan Terraform
       working-directory: ${{ github.workspace }}/terraform

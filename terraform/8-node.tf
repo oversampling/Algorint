@@ -108,6 +108,19 @@ resource "aws_eks_node_group" "general" {
   }
 }
 
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name   = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.eks_ebs_csi_driver.arn
+
+  tags = {
+    Name = "ebs-csi-driver-addon"
+    Project = "algorint"
+  }
+
+  depends_on = [aws_iam_role_policy_attachment.attach_ebs_csi_driver_policy,  aws_eks_cluster.eks, aws_eks_node_group.general] 
+}
+
 output iam_role_nodes {
   value = aws_iam_role.nodes.arn
 }

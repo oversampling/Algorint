@@ -88,18 +88,18 @@ resource "aws_iam_role_policy_attachment" "attach_ebs_csi_driver_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
 
-resource "aws_eks_addon" "ebs_csi_driver" {
-  cluster_name = aws_eks_cluster.eks.name
-  addon_name   = "aws-ebs-csi-driver"
-  service_account_role_arn = aws_iam_role.eks_ebs_csi_driver.arn
+# resource "aws_eks_addon" "ebs_csi_driver" {
+#   cluster_name = aws_eks_cluster.eks.name
+#   addon_name   = "aws-ebs-csi-driver"
+#   service_account_role_arn = aws_iam_role.eks_ebs_csi_driver.arn
 
-  tags = {
-    Name = "ebs-csi-driver-addon"
-    Project = "algorint"
-  }
+#   tags = {
+#     Name = "ebs-csi-driver-addon"
+#     Project = "algorint"
+#   }
 
-  depends_on = [aws_iam_role_policy_attachment.attach_ebs_csi_driver_policy,  aws_eks_cluster.eks] 
-}
+#   depends_on = [aws_iam_role_policy_attachment.attach_ebs_csi_driver_policy,  aws_eks_cluster.eks] 
+# }
 
 # resource "aws_eks_addon" "vpc_cni" {
 #   cluster_name = aws_eks_cluster.eks.name
