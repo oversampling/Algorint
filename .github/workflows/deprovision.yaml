@@ -63,7 +63,7 @@ jobs:
     - name: Destroy Client Application
       working-directory: ${{ github.workspace }}/client/kubernetes/deployment
       run: |
-        kubectl delete -f client-aws.yml
+        kubectl delete -f client-aws.yaml
     
     - name: Destroy IRSA
       run: |
