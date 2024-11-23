@@ -98,7 +98,7 @@ resource "aws_eks_addon" "ebs_csi_driver" {
     Project = "algorint"
   }
 
-  depends_on = [aws_iam_role_policy_attachment.attach_ebs_csi_driver_policy]
+  depends_on = [aws_iam_role_policy_attachment.attach_ebs_csi_driver_policy,  aws_eks_cluster.eks] 
 }
 
 # resource "aws_eks_addon" "vpc_cni" {
